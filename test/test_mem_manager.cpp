@@ -40,6 +40,12 @@ TEST_CASE("print memory listing", "[MEM_MANAGER]") {
   mgr.register_memory("integrals", 1024*2345);
 
   std::cout<<mgr<<std::endl;
-  
+  mgr.poll_mem_usage();
+  int Q=200000;
+  std::vector<int> LV(Q);
+  std::cout<<"adding: "<<sizeof(int)*Q/1024./1024.<<" MB"<<std::endl;
+  mgr.poll_mem_usage();
+  LV[0]=1;
+  LV[Q-1]=1; //so it will not be optimized away
+  std::cout<<LV[0]<<" "<<LV[Q-1]<<std::endl; 
 }
-

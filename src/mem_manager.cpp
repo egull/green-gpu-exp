@@ -1,6 +1,8 @@
 #include"mem_manager.hpp"
 #include <unistd.h>
 #include <iostream>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 void mem_manager::compute_total_memory(){
   //figure out how much memory is available on the machine
@@ -31,4 +33,11 @@ void mem_manager::deregister_memory(const std::string &name){
   if(registered_memory_<0){
     throw std::logic_error("registered memory is below zero");
   }
+}
+std::size_t mem_manager::poll_mem_usage() const{
+  //this posix command has a whole bunch of additional info, we're only polling maxrss
+  //rss is resident set size
+  rusage r;
+  getrusage(RUSAGE_SELF, &r);
+  return r.ru_maxrss;
 }

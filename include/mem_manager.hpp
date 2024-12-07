@@ -22,6 +22,9 @@ public:
   void deregister_memory(const std::string &name);
   //getter for mem entries
   const std::unordered_map<std::string, std::size_t> &entries() const{return entries_;}
+  //poll system to get actual process mem usage 
+  std::size_t poll_mem_usage()const;
+
 private:
   void compute_total_memory();
   //total memory in hardware. Detected by polling system
@@ -39,7 +42,7 @@ inline std::ostream &operator<<(std::ostream &os, const mem_manager &mgr){
   double GB=1024*1024*1024;
   double MB=1024*1024;
   double kB=1024;
-  os<<"#######################Memory Manager#####################";
+  os<<"#######################Memory Manager#####################"<<std::endl;
   os<<"# total memory available: "<<mgr.total_memory()/GB<<" GB"<<std::endl;
   os<<"# "<<std::endl;
   for(auto it=mgr.entries().cbegin(); it!=mgr.entries().cend();++it){
@@ -51,6 +54,17 @@ inline std::ostream &operator<<(std::ostream &os, const mem_manager &mgr){
       os<<"# "<<it->first<<" :\t"<<it->second/GB<<" GB"<<std::endl;
   }
   os<<"# "<<std::endl;
+  std::size_t actual_mem=mgr.poll_mem_usage();
+  if(actual_mem<MB)
+    os<<"# actual mem used: \t"<<mgr.poll_mem_usage()/kB<<" kB"<<std::endl;
+  else if(actual_mem<GB)
+    os<<"# actual mem used: \t"<<mgr.poll_mem_usage()/MB<<" MB"<<std::endl;
+  else
+    os<<"# actual mem used: \t"<<mgr.poll_mem_usage()/GB<<" GB"<<std::endl;
+  //if this comes close to 1 we are using too much memory
+  os<<"# actual mem div hardware mem  : "<<(double)actual_mem/mgr.total_memory()<<std::endl;
+  //if this is far from 1 we substantial memory we did not register
+  os<<"# actual mem div registered mem: "<<actual_mem/(double)mgr.registered_memory()<<std::endl;
   os<<"##########################################################";
   return os;
 }
