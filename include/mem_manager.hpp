@@ -14,8 +14,11 @@ public:
   const std::size_t &total_memory() const{return total_memory_;}
   //memory that has been registered as used 
   const std::size_t &registered_memory() const{return registered_memory_;}
+  const std::size_t &registered_memory(const std::string &s) const{return entries_.at(s);}
   //register memory as used
   void register_memory(const std::string &name, const std::size_t &size);
+  //deregister memory and mark memory as free
+  void deregister_memory(const std::string &name);
 private:
   void compute_total_memory();
   //total memory in hardware. Detected by polling system

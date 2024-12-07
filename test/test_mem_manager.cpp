@@ -11,7 +11,7 @@ TEST_CASE("construct a mem manager", "[MEM_MANAGER]") {
   REQUIRE(total_mem>1024); 
   REQUIRE(mgr.registered_memory()==0); 
 }
-TEST_CASE("register and deregister", "[MEM_MANAGER]") {
+TEST_CASE("register and register twice", "[MEM_MANAGER]") {
   mem_manager mgr;
 
   //register some memory for a 'polarization'
@@ -19,4 +19,15 @@ TEST_CASE("register and deregister", "[MEM_MANAGER]") {
   //duplicate registration
   REQUIRE_THROWS(mgr.register_memory("polarization", 1234));
   REQUIRE(mgr.registered_memory()==1234);
+  REQUIRE(mgr.registered_memory("polarization")==1234);
+}
+TEST_CASE("register and deregister", "[MEM_MANAGER]") {
+  mem_manager mgr;
+
+  //register some memory for a 'polarization'
+  mgr.register_memory("polarization", 1234);
+  REQUIRE(mgr.registered_memory()==1234);
+  //deregister 'polarization'
+  mgr.deregister_memory("polarization");
+  REQUIRE(mgr.registered_memory()==0);
 }

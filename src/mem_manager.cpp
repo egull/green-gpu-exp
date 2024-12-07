@@ -20,3 +20,15 @@ void mem_manager::register_memory(const std::string &name, const std::size_t &si
     std::cout<<"WARNING: allocated memory> total memory: "<<registered_memory_/GB<<" "<<total_memory_/GB<<" GB"<<std::endl;
   }
 }
+void mem_manager::deregister_memory(const std::string &name){
+  //make sure we have unique entries
+  if(entries_.count(name)==0) throw std::runtime_error("Mem manager: entry: "+name+" is not registered");
+
+  std::size_t size=entries_.at(name); 
+  entries_.erase(name);
+  registered_memory_-=size;
+
+  if(registered_memory_<0){
+    throw std::logic_error("registered memory is below zero");
+  }
+}
