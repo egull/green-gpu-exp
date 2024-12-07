@@ -31,3 +31,15 @@ TEST_CASE("register and deregister", "[MEM_MANAGER]") {
   mgr.deregister_memory("polarization");
   REQUIRE(mgr.registered_memory()==0);
 }
+TEST_CASE("print memory listing", "[MEM_MANAGER]") {
+  mem_manager mgr;
+
+  //register some memory for a 'polarization'
+  mgr.register_memory("polarization", 1234);
+  mgr.register_memory("greens function", std::size_t(1024)*1024*1024*3);
+  mgr.register_memory("integrals", 1024*2345);
+
+  std::cout<<mgr<<std::endl;
+  
+}
+
