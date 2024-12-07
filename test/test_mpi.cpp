@@ -7,5 +7,5 @@ TEST_CASE("Size", "[MPI]") {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  REQUIRE(size>=2);  //if this throws run the tests with mpirun -np X, X>=2. 
+  CHECK(size>=2);  //if this throws run the tests with mpirun -np X, X>=2. 
 }
