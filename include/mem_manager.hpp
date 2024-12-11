@@ -1,39 +1,53 @@
 #pragma once
 #include<cstddef>
 #include<string>
-#include<unordered_map>
 #include<iostream>
+#include<vector>
+
+#define MMGR_MAX_STRING_LENGTH 100
+#define MMGR_MAX_REG_ENTRIES 100
 
 //memory manager. all units are in bytes
 class mem_manager{
+
 public:
+  typedef std::pair<char[MMGR_MAX_STRING_LENGTH], std::size_t> entry_t;
+  typedef entry_t* entries_t;
   mem_manager():
    registered_memory_(0.){
+    entries_=new entry_t[MMGR_MAX_REG_ENTRIES];
+    num_entries_=0;
     compute_total_memory();
   }
+  ~mem_manager(){ delete[] entries_;}
   //obtain totally available memory on this machine
   const std::size_t &total_memory() const{return total_memory_;}
-  //memory that has been registered as used 
+  //memory that has been registered as used. return total amount 
   const std::size_t &registered_memory() const{return registered_memory_;}
-  const std::size_t &registered_memory(const std::string &s) const{return entries_.at(s);}
+  //memory that has been registered as used. return amoutn belonging to string s
+  const std::size_t &registered_memory(const std::string &s) const;
   //register memory as used
   void register_memory(const std::string &name, const std::size_t &size);
   //deregister memory and mark memory as free
   void deregister_memory(const std::string &name);
   //getter for mem entries
-  const std::unordered_map<std::string, std::size_t> &entries() const{return entries_;}
+  const entries_t &entries() const{return entries_;}
+  //getter for # of entries
+  const std::size_t&num_entries() const{return num_entries_;}
   //poll system to get actual process mem usage 
   std::size_t poll_mem_usage()const;
 
 private:
   void compute_total_memory();
+  std::size_t count(const std::string &s) const;
   //total memory in hardware. Detected by polling system
   std::size_t total_memory_;  
   
   //memory registered as used 
   std::size_t registered_memory_;  
 
-  std::unordered_map<std::string, std::size_t> entries_;
+  entries_t entries_;
+  std::size_t num_entries_;
 
   //constant for gigabytes
   constexpr static std::size_t GB=1024*1024*1024;
@@ -45,13 +59,13 @@ inline std::ostream &operator<<(std::ostream &os, const mem_manager &mgr){
   os<<"#######################Memory Manager#####################"<<std::endl;
   os<<"# total memory available: "<<mgr.total_memory()/GB<<" GB"<<std::endl;
   os<<"# "<<std::endl;
-  for(auto it=mgr.entries().cbegin(); it!=mgr.entries().cend();++it){
-    if(it->second <MB)
-      os<<"# "<<it->first<<" :\t"<<it->second/kB<<" kB"<<std::endl;
-    else if(it->second <GB)
-      os<<"# "<<it->first<<" :\t"<<it->second/MB<<" MB"<<std::endl;
+  for(int i=0;i<mgr.num_entries();++i){
+    if(mgr.entries()[i].second <MB)
+      os<<"# "<<mgr.entries()[i].first<<" :\t"<<mgr.entries()[i].second/kB<<" kB"<<std::endl;
+    else if(mgr.entries()[i].second <GB)
+      os<<"# "<<mgr.entries()[i].first<<" :\t"<<mgr.entries()[i].second/MB<<" MB"<<std::endl;
     else 
-      os<<"# "<<it->first<<" :\t"<<it->second/GB<<" GB"<<std::endl;
+      os<<"# "<<mgr.entries()[i].first<<" :\t"<<mgr.entries()[i].second/GB<<" GB"<<std::endl;
   }
   os<<"# "<<std::endl;
   std::size_t actual_mem=mgr.poll_mem_usage();
