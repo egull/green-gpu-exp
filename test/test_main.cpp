@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
   int rank=0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  if(!rank) std::cout<<"running tests under MPI on "<<size<<" processes. Only printing results from rank 0."<<std::endl;
+  if(!rank) std::cout<<"running tests under MPI on "<<size<<" processes"<<std::endl;
 
 
   int result = Catch::Session().run( argc, argv );

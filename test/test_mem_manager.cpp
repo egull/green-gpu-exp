@@ -5,6 +5,10 @@
 
 TEST_CASE("construct a mem manager", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
 
   //poll total memory on machine
   std::size_t total_mem=mgr.total_memory();
@@ -14,6 +18,10 @@ TEST_CASE("construct a mem manager", "[MEM_MANAGER]") {
 }
 TEST_CASE("register and register twice", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
 
   //register some memory for a 'polarization'
   mgr.register_memory("polarization", 1234);
@@ -24,6 +32,10 @@ TEST_CASE("register and register twice", "[MEM_MANAGER]") {
 }
 TEST_CASE("register and deregister", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
 
   //register some memory for a 'polarization'
   mgr.register_memory("polarization", 1234);
@@ -34,6 +46,10 @@ TEST_CASE("register and deregister", "[MEM_MANAGER]") {
 }
 TEST_CASE("print memory listing", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
 
   //register some memory for a 'polarization'
   mgr.register_memory("polarization", 1234);
@@ -52,6 +68,10 @@ TEST_CASE("print memory listing", "[MEM_MANAGER]") {
 }
 TEST_CASE("register and deregister random order", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
 
   //register some memory for a 'polarization'
   mgr.register_memory("polarization 1", 1234);
@@ -71,6 +91,10 @@ TEST_CASE("register and deregister random order", "[MEM_MANAGER]") {
 }
 TEST_CASE("too many entries", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
   int limit=100;
   for(int s=0;s<limit-1;++s){
     std::stringstream name; name<<"entry_"<<s;
@@ -80,6 +104,10 @@ TEST_CASE("too many entries", "[MEM_MANAGER]") {
 }
 TEST_CASE("too long entry", "[MEM_MANAGER]") {
   mem_manager mgr;
+  int rank=0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if(rank>0) return;
+
   int char_limit=100;
   std::stringstream name; 
   for(int i=0;i<char_limit;++i) name<<"a";
