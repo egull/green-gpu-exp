@@ -2,6 +2,7 @@
 #include<cstddef>
 #include<string>
 #include<iostream>
+#include<sstream>
 #include<vector>
 #include<mpi.h>
 
@@ -32,8 +33,12 @@ public:
   const std::size_t &registered_memory(const std::string &s) const;
   //register memory as used
   void register_memory(const std::string &name, const std::size_t &size);
+  //register memory as used. pass in rank to generate a name
+  void register_memory(const std::string &name, int rank, const std::size_t &size);
   //deregister memory and mark memory as free
   void deregister_memory(const std::string &name);
+  //deregister memory and mark memory as free, passing in also a rank
+  void deregister_memory(const std::string &name, int rank);
   //getter for mem entries
   const entry_t *entries() const{return shmem_ptr_->entries_;}
   //getter for # of entries
@@ -93,7 +98,7 @@ inline std::ostream &operator<<(std::ostream &os, const mem_manager &mgr){
   //if this comes close to 1 we are using too much memory
   os<<"# actual mem div hardware mem  : "<<(double)actual_mem/mgr.total_memory()<<std::endl;
   //if this is far from 1 we substantial memory we did not register
-  os<<"# actual mem div registered mem: "<<actual_mem/(double)mgr.registered_memory()<<std::endl;
+  os<<"# registered mem div actual mem: "<<(double)mgr.registered_memory()/(double)actual_mem<<std::endl;
   os<<"##########################################################";
   return os;
 }

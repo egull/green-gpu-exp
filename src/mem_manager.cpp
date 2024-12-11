@@ -27,6 +27,10 @@ void mem_manager::register_memory(const std::string &name, const std::size_t &si
   }
   MPI_Win_unlock(0, shmem_win_);
 }
+void mem_manager::register_memory(const std::string &name, int rank, const std::size_t &size){
+  std::stringstream nr; nr<<name<<"_"<<rank;
+  register_memory(nr.str(), size);
+}
 void mem_manager::deregister_memory(const std::string &name){
   MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, shmem_win_);
   //make sure we have unique entries
@@ -43,6 +47,10 @@ void mem_manager::deregister_memory(const std::string &name){
     throw std::logic_error("registered memory is below zero");
   }
   MPI_Win_unlock(0, shmem_win_);
+}
+void mem_manager::deregister_memory(const std::string &name, int rank){
+  std::stringstream nr; nr<<name<<"_"<<rank;
+  deregister_memory(nr.str());
 }
 std::size_t mem_manager::poll_mem_usage() const{
   //this posix command has a whole bunch of additional info, we're only polling maxrss

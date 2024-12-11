@@ -13,7 +13,8 @@ enable_testing()
 
 set(test_src
   test_main.cpp
-#  test_mpi.cpp
+  test_mpi.cpp
+  test_distributed.cpp
   test_mem_manager.cpp
 )
 
