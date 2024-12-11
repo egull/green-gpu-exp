@@ -3,6 +3,7 @@
 #include<string>
 #include<iostream>
 #include<vector>
+#include<mpi.h>
 
 #define MMGR_MAX_STRING_LENGTH 100
 #define MMGR_MAX_REG_ENTRIES 100
@@ -13,17 +14,20 @@ class mem_manager{
 public:
   typedef std::pair<char[MMGR_MAX_STRING_LENGTH], std::size_t> entry_t;
   typedef entry_t* entries_t;
-  mem_manager():
-   registered_memory_(0.){
-    entries_=new entry_t[MMGR_MAX_REG_ENTRIES];
-    num_entries_=0;
+  mem_manager()
+   {
+    allocate_memory();
+    shmem_ptr_->num_entries_=0;
+    shmem_ptr_->registered_memory_=0;
     compute_total_memory();
   }
-  ~mem_manager(){ delete[] entries_;}
+  ~mem_manager(){
+    MPI_Win_free(&shmem_win_);
+  }
   //obtain totally available memory on this machine
   const std::size_t &total_memory() const{return total_memory_;}
   //memory that has been registered as used. return total amount 
-  const std::size_t &registered_memory() const{return registered_memory_;}
+  const std::size_t &registered_memory() const{return shmem_ptr_->registered_memory_;}
   //memory that has been registered as used. return amoutn belonging to string s
   const std::size_t &registered_memory(const std::string &s) const;
   //register memory as used
@@ -31,23 +35,34 @@ public:
   //deregister memory and mark memory as free
   void deregister_memory(const std::string &name);
   //getter for mem entries
-  const entries_t &entries() const{return entries_;}
+  const entry_t *entries() const{return shmem_ptr_->entries_;}
   //getter for # of entries
-  const std::size_t&num_entries() const{return num_entries_;}
+  const std::size_t&num_entries() const{return shmem_ptr_->num_entries_;}
   //poll system to get actual process mem usage 
   std::size_t poll_mem_usage()const;
 
 private:
+  //shared memory allocation of shared buffer
+  void allocate_memory();
   void compute_total_memory();
   std::size_t count(const std::string &s) const;
   //total memory in hardware. Detected by polling system
   std::size_t total_memory_;  
-  
-  //memory registered as used 
-  std::size_t registered_memory_;  
+ 
+  struct shmem{
+    //memory registered as used 
+    std::size_t registered_memory_;  //size of memory registered
+    entry_t entries_[MMGR_MAX_REG_ENTRIES];       //actual entries
+    std::size_t num_entries_; //# of entries
+  } *shmem_ptr_;  //use this for access
 
-  entries_t entries_;
-  std::size_t num_entries_;
+  shmem *shmem_alloc_; //this is only valid on shmem rank 0
+  MPI_Win   shmem_win_;
+
+  //MPI shmem communicators,, rank, and size
+  MPI_Comm shmem_comm_;
+  int shmem_size_;
+  int shmem_rank_;
 
   //constant for gigabytes
   constexpr static std::size_t GB=1024*1024*1024;
