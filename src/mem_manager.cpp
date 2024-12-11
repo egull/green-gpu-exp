@@ -11,6 +11,8 @@ void mem_manager::compute_total_memory(){
   total_memory_=pages*page_size;
 }
 void mem_manager::register_memory(const std::string &name, const std::size_t &size){
+  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, shmem_win_);
+
   //make sure we have unique entries
   if(count(name)>0) throw std::runtime_error("Mem manager: entry: "+name+"is already registered");
   if(shmem_ptr_->num_entries_==MMGR_MAX_REG_ENTRIES-1) throw std::runtime_error("too many registered mem entries, increase max size");
@@ -23,8 +25,10 @@ void mem_manager::register_memory(const std::string &name, const std::size_t &si
     //consider throwing to save the user some pain.
     std::cout<<"WARNING: allocated memory> total memory: "<<shmem_ptr_->registered_memory_/GB<<" "<<total_memory_/GB<<" GB"<<std::endl;
   }
+  MPI_Win_unlock(0, shmem_win_);
 }
 void mem_manager::deregister_memory(const std::string &name){
+  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, shmem_win_);
   //make sure we have unique entries
   if(count(name)==0) throw std::runtime_error("Mem manager: entry: "+name+" is not registered");
 
@@ -38,6 +42,7 @@ void mem_manager::deregister_memory(const std::string &name){
   if(shmem_ptr_->registered_memory_<0){
     throw std::logic_error("registered memory is below zero");
   }
+  MPI_Win_unlock(0, shmem_win_);
 }
 std::size_t mem_manager::poll_mem_usage() const{
   //this posix command has a whole bunch of additional info, we're only polling maxrss
