@@ -93,13 +93,16 @@ namespace green::gpu {
   
       //register memory passed in
       if(shmem_rank_==0){
-        task_mgr.register_memory("sigma_tau (shared)",_nk*_ns*_
-_ink*_nk*_ns*_nts*(
-                      matmul_cost(_NQ*_nao
+        _mem_mgr.register_memory("sigma_tau (shared nodelocal)",sigma_tau.object().size());
+        _mem_mgr.register_memory("g         (shared nodelocal)",sigma_tau.object().size());
+      }
 
       //allocate MPI communicators
       setup_MPI_structure(); //revise this. based on node and GPU communicators.
       _coul_int = new df_integral_t(_path, _nao, _NQ, _bz_utils);
+      if(shmem_rank_==0){
+        _mem_mgr.register_memory("Coulomb (shared nodelocal)", _coul_int->size());
+      }
       MPI_Barrier(utils::context.global);
       statistics.end(); //end of Initialization epoch
 

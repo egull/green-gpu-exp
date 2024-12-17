@@ -1,8 +1,9 @@
-#include"mem_manager.hpp"
+#include"green/gpu/mem_manager.h"
 #include <unistd.h>
 #include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <string.h>
 
 void mem_manager::compute_total_memory(){
   //figure out how much memory is available on the machine
