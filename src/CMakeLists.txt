@@ -15,3 +15,5 @@ target_link_libraries(gpu CUDA::cudart CUDA::cuda_driver CUDA::cublas CUDA::cuso
 target_link_libraries(gpu accel-lib)
 target_link_libraries(gpu GREEN::UTILS GREEN::NDARRAY GREEN::SYMMETRY GREEN::GRIDS GREEN::PARAMS GREEN::INTEGRALS)
 set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES ${GPU_ARCHS}) #also check same parameters in accel
+
+
