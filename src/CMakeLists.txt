@@ -9,7 +9,7 @@ target_include_directories(accel-lib PUBLIC .)
 target_link_libraries(accel-lib CUDA::cudart CUDA::cuda_driver CUDA::cublas CUDA::cusolver)
 target_link_libraries(accel-lib GREEN::UTILS GREEN::NDARRAY GREEN::GRIDS GREEN::INTEGRALS GREEN::H5PP)
 
-add_library(gpu gpu_kernel.cpp hf_gpu_kernel.cpp gw_gpu_kernel.cpp)
+add_library(gpu gpu_kernel.cpp hf_gpu_kernel.cpp gw_gpu_kernel.cpp mem_manager.cpp)
 target_include_directories(gpu PUBLIC .)
 target_link_libraries(gpu CUDA::cudart CUDA::cuda_driver CUDA::cublas CUDA::cusolver)
 target_link_libraries(gpu accel-lib)

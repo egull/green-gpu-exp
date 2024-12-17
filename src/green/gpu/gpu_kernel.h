@@ -30,6 +30,7 @@
 
 #include "common_defs.h"
 #include "cuda_check.h"
+#include "mem_manager.h"
 
 namespace green::gpu {
   using green::integrals::df_integral_t;
@@ -147,6 +148,8 @@ namespace green::gpu {
 
     std::complex<double>* _Vk1k2_Qij;
     utils::timing         statistics;
+
+    mem_manager _mem_mgr;
   };
 
 }  // namespace green::gpu

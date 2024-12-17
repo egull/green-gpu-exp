@@ -81,19 +81,28 @@ namespace green::gpu {
     }
 
     void gw_gpu_kernel::solve(G_type& g, St_type& sigma_tau) {
+      statistics.start("total");
+
+      //allocate ad initialize  self-energy
+      statistics.start("Initialization");
       MPI_Datatype dt_matrix = utils::create_matrix_datatype<std::complex<double>>(_nso*_nso);
       MPI_Op matrix_sum_op = utils::create_matrix_operation<std::complex<double>>();
-      statistics.start("total");
-      statistics.start("Initialization");
       sigma_tau.fence();
       if (!utils::context.node_rank) sigma_tau.object().set_zero();
       sigma_tau.fence();
-      setup_MPI_structure();
+  
+      //register memory passed in
+      if(shmem_rank_==0){
+        task_mgr.register_memory("sigma_tau (shared)",_nk*_ns*_
+_ink*_nk*_ns*_nts*(
+                      matmul_cost(_NQ*_nao
+
+      //allocate MPI communicators
+      setup_MPI_structure(); //revise this. based on node and GPU communicators.
       _coul_int = new df_integral_t(_path, _nao, _NQ, _bz_utils);
-      //_coul_int = new df_integral_t(_path, _nao, _nk, _NQ, _bz_utils);
       MPI_Barrier(utils::context.global);
-      set_shared_Coulomb();
-      statistics.end();
+      statistics.end(); //end of Initialization epoch
+
       update_integrals(_coul_int, statistics);
       // Only those processes assigned with a device will be involved in GW self-energy calculation
       if (_devices_comm != MPI_COMM_NULL) {

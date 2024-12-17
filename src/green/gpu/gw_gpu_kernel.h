@@ -64,7 +64,16 @@ namespace green::gpu {
         _nw(ft.sd().repn_fermi().nw()), _nw_b(ft.sd().repn_bose().nw()), _sp(p["P_sp"].as<bool>() && p["Sigma_sp"].as<bool>()),
         _ft(ft), _nt_batch(p["nt_batch"]), _path(p["dfintegral_file"]), _cuda_lin_solver(cuda_lin_solver) {
       // Check if nts is an even number since we will take the advantage of Pq0(beta-t) = Pq0(t) later
-      if (_nts % 2 != 0) throw std::runtime_error("Number of tau points should be even number");
+      if (_nts % 2 != 0) throw std::runtime_error("Number of tau points should be even");
+
+
+      //initialize global and shmem ranks and size
+      MPI_Comm_rank(MPI_COMM_WORLD, &global_rank_);
+      MPI_Comm_size(MPI_COMM_WORLD, &global_size_);
+      MPI_Info info; MPI_Info_create(&info);
+      MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,global_rank_,info,&shmem_comm_);
+      MPI_Comm_size(shmem_comm_,&shmem_size_);
+      MPI_Comm_rank(shmem_comm_,&shmem_rank_);
     }
 
     /**
@@ -87,8 +96,6 @@ namespace green::gpu {
 
     /**
      * \brief calculate effective floating points operations per second reached on GPU.
-     * This is not representative of the GPU capabilities, but instead, accounts for read/write overheads.
-     * The value is entirely in the context Green-MBPT solver.
      */
     void flops_achieved(MPI_Comm comm);
 
@@ -118,6 +125,13 @@ namespace green::gpu {
     double                      _flop_count{};
     double                      _eff_flops{};
     LinearSolverType            _cuda_lin_solver;
+
+    //communicators here are a bit different from before. For simplicity some of this info is replicated.
+    int shmem_size_;    //shared mem size ('number of cores per node')
+    int shmem_rank_;    //shared mem rank
+    MPI_Comm shmem_comm_; //shared mem intranode communicator
+    int global_size_;   //global size (MPI world size)
+    int global_rank_;   //global rank
   };
 
   class scalar_gw_gpu_kernel : public gw_gpu_kernel {
