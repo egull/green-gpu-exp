@@ -93,18 +93,41 @@ namespace green::gpu {
   
       //register memory passed in
       if(shmem_rank_==0){
-        _mem_mgr.register_memory("sigma_tau (shared nodelocal)",sigma_tau.object().size());
-        _mem_mgr.register_memory("g         (shared nodelocal)",sigma_tau.object().size());
+        _mem_mgr.register_memory("sigma_tau (shared nodelocal)",sigma_tau.object().size()*sizeof(std::complex<double>));
+        _mem_mgr.register_memory("g         (shared nodelocal)",g.object().size()*sizeof(std::complex<double>));
       }
 
       //allocate MPI communicators
       setup_MPI_structure(); //revise this. based on node and GPU communicators.
       _coul_int = new df_integral_t(_path, _nao, _NQ, _bz_utils);
       if(shmem_rank_==0){
-        _mem_mgr.register_memory("Coulomb (shared nodelocal)", _coul_int->size());
+        _mem_mgr.register_memory("Coulomb (shared nodelocal)", _coul_int->size()*sizeof(std::complex<double>));
       }
       MPI_Barrier(utils::context.global);
+      int task_verbose=5;
+      tasks_=task_t::define_tasks(_ink, _nk, global_size_/shmem_size_, shmem_size_,_devices_size , task_verbose);
       statistics.end(); //end of Initialization epoch
+
+
+      if(shmem_rank_==0)
+        std::cerr<<_mem_mgr<<std::endl;
+
+      if(shmem_rank_==0){
+        std::cout<<"### task summary: (Q k GPU)"<<std::endl;
+        for(int cycle=0;cycle<tasks_.size();++cycle){
+          std::cout<<"cycle: "<<cycle<<" ";
+          for(int c=0;c<global_size_;++c){
+            if(tasks_[cycle][c].idle)
+              std::cout<<"(-) ";
+            else
+              std::cout<<"("<<tasks_[cycle][c].q<<" "<<tasks_[cycle][c].k<<" "<<tasks_[cycle][c].gpu<<") ";
+          }
+          std::cout<<std::endl;
+        }
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Finalize();
+      exit(1);
 
       update_integrals(_coul_int, statistics);
       // Only those processes assigned with a device will be involved in GW self-energy calculation

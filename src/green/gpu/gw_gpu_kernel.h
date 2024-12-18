@@ -34,6 +34,7 @@
 #include "common_defs.h"
 #include <green/integrals/df_integral_t.h>
 #include "gpu_kernel.h"
+#include "task_manager.h"
 
 namespace green::gpu {
   /**
@@ -132,6 +133,7 @@ namespace green::gpu {
     MPI_Comm shmem_comm_; //shared mem intranode communicator
     int global_size_;   //global size (MPI world size)
     int global_rank_;   //global rank
+    std::vector<std::vector<task_t> > tasks_; //what to do in which order.
   };
 
   class scalar_gw_gpu_kernel : public gw_gpu_kernel {
