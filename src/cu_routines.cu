@@ -143,7 +143,7 @@ namespace green::gpu {
       int k = irre_list[k_reduced_id];
       for (size_t k2 = 0; k2 < _nk; k2 += _nk_batch) {
         // Given k, k2, read V_k(k2~k2+nk_batch, Q, i, j) on CPU
-        if (integral_type == green::integrals::as_a_whole) {
+        if (integral_type == green::integrals::read_all_integrals_at_once) {
           r1(k, k2, Vk1k2_Qij, V_kbatchQij);
         } else {
           r2(k, k2, V_kbatchQij);

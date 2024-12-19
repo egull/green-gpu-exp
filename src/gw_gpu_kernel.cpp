@@ -129,7 +129,7 @@ namespace green::gpu {
       MPI_Finalize();
       exit(1);
 
-      update_integrals(_coul_int, statistics);
+      if (_coul_int_reading_type == green::integrals::read_all_integrals_at_once) read_all_integrals(_coul_int, statistics);
       // Only those processes assigned with a device will be involved in GW self-energy calculation
       if (_devices_comm != MPI_COMM_NULL) {
         gw_innerloop(g, sigma_tau);
@@ -223,7 +223,7 @@ namespace green::gpu {
                                          bool need_minus_k, bool need_minus_k1) {
         statistics.start("read");
         int q = k_vector[2];
-        if (_coul_int_reading_type == green::integrals::chunks) {
+        if (_coul_int_reading_type == green::integrals::read_integrals_in_chunks) {
           read_next(k_vector);
           _coul_int->symmetrize(V_Qpm, k, k1);
         } else {
@@ -241,7 +241,7 @@ namespace green::gpu {
                                         bool need_minus_k1) {
         statistics.start("read");
         int q = k_vector[1];
-        if (_coul_int_reading_type == green::integrals::chunks) {
+        if (_coul_int_reading_type == green::integrals::read_integrals_in_chunks) {
           read_next(k_vector);
           _coul_int->symmetrize(V_Qim, k, k1);
         } else {
@@ -346,7 +346,7 @@ namespace green::gpu {
 
           statistics.start("read");
           int q = k_vector[2];
-          if (q == 0 or _coul_int_reading_type == green::integrals::chunks) {
+          if (q == 0 or _coul_int_reading_type == green::integrals::read_integrals_in_chunks) {
             read_next(k_vector);
             _coul_int->symmetrize(V_Qpm, k, k1);
           } else {
@@ -362,7 +362,7 @@ namespace green::gpu {
                                          bool need_minus_k1) {
           statistics.start("read");
           int q = k_vector[1];
-          if (q == 0 or _coul_int_reading_type == green::integrals::chunks) {
+          if (q == 0 or _coul_int_reading_type == green::integrals::read_integrals_in_chunks) {
             read_next(k_vector);
             _coul_int->symmetrize(V_Qim, k, k1);
           } else {
