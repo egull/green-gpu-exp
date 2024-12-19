@@ -209,7 +209,26 @@ namespace green::gpu {
     template<typename prec>
     void scalar_gw_gpu_kernel::compute_gw_selfenergy(int cycle, G_type& g, St_type& sigma_tau) {
       // check devices' free space and space requirements
-      int q_this_cycle=tasks_
+      task_t this_task=tasks_[cycle][global_rank_];
+
+      //make a communicator with all cores that have the same q.
+      MPI_Comm q_comm;
+      MPI_Comm_split(MPI_COMM_WORLD, this_task.q, this_task.k, &q_comm); //splitting the MPI communicator according to q
+      if(this_task.idle) return;
+      int q_rank, q_size;
+      MPI_Comm_rank(q_comm, &q_rank);
+      MPI_Comm_size(q_comm, &q_size);
+
+      ztensor<4> Sigmak_tsij(_nts, _ns, _nao, _nao); //end result: sigma for a given k
+      ztensor<4> P0Q_tsab(_nts, _ns, _NQ, _NQ); //intermediate step: P0 for a given Q 
+      _mem_mgr.register_memory("sigma_tau k",global_rank_,Sigmak_tsij.size()*sizeof(std::complex<prec>));
+      _mem_mgr.register_memory("P_tau Q",global_rank_,P0Q_tsab.size()*sizeof(std::complex<prec>));
+      if(shmem_rank_==0)
+        std::cerr<<_mem_mgr<<std::endl;
+
+
+      /*
+
       GW_check_devices_free_space();
       statistics.start("Initialization");
       cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, g.object(), _low_device_memory,
@@ -259,7 +278,6 @@ namespace green::gpu {
       // instaed of adding locks in cugw.solve(), we allocate private _Sigma_tskij_local_host
       // and do MPIAllreduce on CPU later on. Since the number of processes with a GPU is very
       // limited, the additional memory overhead is fairly limited.
-      ztensor<5> Sigma_tskij_host_local(_nts, _ns, _ink, _nao, _nao);
       statistics.start("Solve cuGW");
       cugw.solve(_nts, _ns, _nk, _ink, _nao, _bz_utils.symmetry().reduced_to_full(), _bz_utils.symmetry().full_to_reduced(),
                  _Vk1k2_Qij, Sigma_tskij_host_local, _devices_rank, _devices_size, _low_device_memory, _verbose,
@@ -270,7 +288,7 @@ namespace green::gpu {
       MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, sigma_tau.win());
       sigma_tau.object() += Sigma_tskij_host_local;
       MPI_Win_unlock(0, sigma_tau.win());
-      statistics.end();
+      statistics.end();*/
     }
 
     void gw_gpu_kernel::GW_check_devices_free_space() {
