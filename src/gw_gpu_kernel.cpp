@@ -209,6 +209,7 @@ namespace green::gpu {
     template<typename prec>
     void scalar_gw_gpu_kernel::compute_gw_selfenergy(int cycle, G_type& g, St_type& sigma_tau) {
       // check devices' free space and space requirements
+      int q_this_cycle=tasks_
       GW_check_devices_free_space();
       statistics.start("Initialization");
       cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, g.object(), _low_device_memory,
