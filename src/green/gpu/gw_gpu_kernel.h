@@ -87,7 +87,7 @@ namespace green::gpu {
     ~gw_gpu_kernel() override = default;
 
   protected:
-    virtual void gw_innerloop(G_type& g, St_type& sigma_tau) = 0;
+    virtual void gw_cycle(int cycle, G_type& g, St_type& sigma_tau) = 0;
     void GW_check_devices_free_space();
 
     /**
@@ -160,12 +160,12 @@ namespace green::gpu {
     ~scalar_gw_gpu_kernel() override = default;
 
   protected:
-    void gw_innerloop(G_type& g, St_type& sigma_tau) override;
+    void gw_cycle(int cycle, G_type& g, St_type& sigma_tau) override;
   private:
     void complexity_estimation();
 
     template <typename prec>
-    void compute_gw_selfenergy(G_type& g, St_type& sigma_tau);
+    void compute_gw_selfenergy(int cycle, G_type& g, St_type& sigma_tau);
 
     void copy_Gk(const ztensor<5>& G_tskij_host, tensor<std::complex<double>, 4>& Gk_stij, int k, bool minus_t);
     void copy_Gk(const ztensor<5>& G_tskij_host, tensor<std::complex<float>, 4>& Gk_stij, int k, bool minus_t);
@@ -196,12 +196,12 @@ namespace green::gpu {
 
     ~x2c_gw_gpu_kernel() override = default;
   protected:
-    void gw_innerloop(G_type& g, St_type& sigma_tau) override;
+    void gw_cycle(int cycle, G_type& g, St_type& sigma_tau) override;
   private:
     void complexity_estimation();
 
     template<typename prec>
-    void compute_2c_gw_selfenergy(G_type& g, St_type& sigma_tau);
+    void compute_2c_gw_selfenergy(int cycle, G_type& g, St_type& sigma_tau);
 
     void copy_Gk_2c(const ztensor<5> &G_tskij_host, tensor<std::complex<double>,4> &Gk_4tij, int k, bool need_minus_k, bool minus_t);
     void copy_Gk_2c(const ztensor<5> &G_tskij_host, tensor<std::complex<float>,4> &Gk_4tij, int k, bool need_minus_k, bool minus_t);

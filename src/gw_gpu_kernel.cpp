@@ -131,8 +131,9 @@ namespace green::gpu {
 
       if (_coul_int_reading_type == green::integrals::read_all_integrals_at_once) read_all_integrals(_coul_int, statistics);
       // Only those processes assigned with a device will be involved in GW self-energy calculation
-      if (_devices_comm != MPI_COMM_NULL) {
-        gw_innerloop(g, sigma_tau);
+      for(int cycle=0;cycle<tasks_.size();++cycle){
+        if(_verbose>3 && global_rank_==0) std::cout<<"GW cycle: "<<cycle<<" of: "<<tasks_.size()<<std::endl;
+        gw_cycle(cycle, g, sigma_tau);
       }
       MPI_Barrier(utils::context.global);
       sigma_tau.fence();
@@ -189,24 +190,24 @@ namespace green::gpu {
       }
     }
 
-    void scalar_gw_gpu_kernel::gw_innerloop(G_type& g, St_type& sigma_tau) {
+    void scalar_gw_gpu_kernel::gw_cycle(int cycle, G_type& g, St_type& sigma_tau) {
       if (!_sp) {
-        compute_gw_selfenergy<double>(g, sigma_tau);
+        compute_gw_selfenergy<double>(cycle, g, sigma_tau);
       } else {
-        compute_gw_selfenergy<float>(g, sigma_tau);
+        compute_gw_selfenergy<float>(cycle, g, sigma_tau);
       }
     }
 
-    void x2c_gw_gpu_kernel::gw_innerloop(G_type& g, St_type& sigma_tau) {
+    void x2c_gw_gpu_kernel::gw_cycle(int cycle, G_type& g, St_type& sigma_tau) {
       if (!_sp) {
-        compute_2c_gw_selfenergy<double>(g, sigma_tau);
+        compute_2c_gw_selfenergy<double>(cycle, g, sigma_tau);
       } else {
-        compute_2c_gw_selfenergy<float>(g, sigma_tau);
+        compute_2c_gw_selfenergy<float>(cycle, g, sigma_tau);
       }
     }
 
     template<typename prec>
-    void scalar_gw_gpu_kernel::compute_gw_selfenergy(G_type& g, St_type& sigma_tau) {
+    void scalar_gw_gpu_kernel::compute_gw_selfenergy(int cycle, G_type& g, St_type& sigma_tau) {
       // check devices' free space and space requirements
       GW_check_devices_free_space();
       statistics.start("Initialization");
@@ -324,7 +325,10 @@ namespace green::gpu {
     }
 
     template<typename prec>
-    void x2c_gw_gpu_kernel::compute_2c_gw_selfenergy(G_type& g, St_type& sigma_tau) {
+    void x2c_gw_gpu_kernel::compute_2c_gw_selfenergy(int cycle, G_type& g, St_type& sigma_tau) {
+
+exit(-1); //not implemented.
+
       // check devices' free space and space requirements
       GW_check_devices_free_space();
       statistics.start("Initialization");
@@ -434,11 +438,11 @@ namespace green::gpu {
     }
 
     // Explicit instatiations
-    template void scalar_gw_gpu_kernel::compute_gw_selfenergy<float>(G_type& g, St_type& sigma_tau);
-    template void scalar_gw_gpu_kernel::compute_gw_selfenergy<double>(G_type& g, St_type& sigma_tau);
+    template void scalar_gw_gpu_kernel::compute_gw_selfenergy<float>(int cycle, G_type& g, St_type& sigma_tau);
+    template void scalar_gw_gpu_kernel::compute_gw_selfenergy<double>(int cycle, G_type& g, St_type& sigma_tau);
 
-    template void x2c_gw_gpu_kernel::compute_2c_gw_selfenergy<float>(G_type& g, St_type& sigma_tau);
-    template void x2c_gw_gpu_kernel::compute_2c_gw_selfenergy<double>(G_type& g, St_type& sigma_tau);
+    template void x2c_gw_gpu_kernel::compute_2c_gw_selfenergy<float>(int cycle, G_type& g, St_type& sigma_tau);
+    template void x2c_gw_gpu_kernel::compute_2c_gw_selfenergy<double>(int cycle, G_type& g, St_type& sigma_tau);
 
   void gw_gpu_kernel::read_next(const std::array<size_t, 4> &k) {
     // k = (k1, 0, q, k1+q) or (k1, q, 0, k1-q)
