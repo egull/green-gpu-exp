@@ -77,7 +77,8 @@ inline std::ostream &operator<<(std::ostream &os, const mem_manager &mgr){
   double MB=1024*1024;
   double kB=1024;
   os<<"#######################Memory Manager#####################"<<std::endl;
-  os<<"# total memory available: "<<mgr.total_memory()/GB<<" GB"<<std::endl;
+  os<<"# total memory available : "<<mgr.total_memory()/GB<<" GB"<<std::endl;
+  os<<"# total memory registered: "<<mgr.registered_memory()/GB<<" GB"<<std::endl;
   os<<"# "<<std::endl;
   for(int i=0;i<mgr.num_entries();++i){
     if(mgr.entries()[i].second <MB)

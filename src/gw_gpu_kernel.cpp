@@ -104,7 +104,7 @@ namespace green::gpu {
         _mem_mgr.register_memory("Coulomb (shared nodelocal)", _coul_int->size()*sizeof(std::complex<double>));
       }
       MPI_Barrier(utils::context.global);
-      int task_verbose=5;
+      int task_verbose=2;
       tasks_=task_t::define_tasks(_ink, _nk, global_size_/shmem_size_, shmem_size_,_devices_size , task_verbose);
       statistics.end(); //end of Initialization epoch
 
@@ -113,7 +113,7 @@ namespace green::gpu {
         std::cerr<<_mem_mgr<<std::endl;
 
       if(shmem_rank_==0){
-        std::cout<<"### task summary: (Q k GPU)"<<std::endl;
+        /*std::cout<<"### task summary: (Q k GPU)"<<std::endl;
         for(int cycle=0;cycle<tasks_.size();++cycle){
           std::cout<<"cycle: "<<cycle<<" ";
           for(int c=0;c<global_size_;++c){
@@ -123,18 +123,21 @@ namespace green::gpu {
               std::cout<<"("<<tasks_[cycle][c].q<<" "<<tasks_[cycle][c].k<<" "<<tasks_[cycle][c].gpu<<") ";
           }
           std::cout<<std::endl;
-        }
+        }*/
       }
-      MPI_Barrier(MPI_COMM_WORLD);
-      MPI_Finalize();
-      exit(1);
 
-      if (_coul_int_reading_type == green::integrals::read_all_integrals_at_once) read_all_integrals(_coul_int, statistics);
+      if (_coul_int_reading_type == green::integrals::read_all_integrals_at_once && shmem_rank_==0){
+        std::cout<<"reading all integrals."<<std::endl;
+        read_all_integrals(_coul_int, statistics);
+      }
       // Only those processes assigned with a device will be involved in GW self-energy calculation
       for(int cycle=0;cycle<tasks_.size();++cycle){
+        MPI_Barrier(MPI_COMM_WORLD);
         if(_verbose>3 && global_rank_==0) std::cout<<"GW cycle: "<<cycle<<" of: "<<tasks_.size()<<std::endl;
         gw_cycle(cycle, g, sigma_tau);
       }
+      MPI_Finalize();
+      exit(1);
       MPI_Barrier(utils::context.global);
       sigma_tau.fence();
       // Print effective FLOPs achieved in the calculation
@@ -214,7 +217,10 @@ namespace green::gpu {
       //make a communicator with all cores that have the same q.
       MPI_Comm q_comm;
       MPI_Comm_split(MPI_COMM_WORLD, this_task.q, this_task.k, &q_comm); //splitting the MPI communicator according to q
-      if(this_task.idle) return;
+      if(this_task.idle){
+        MPI_Barrier(MPI_COMM_WORLD);
+        return;
+      }
       int q_rank, q_size;
       MPI_Comm_rank(q_comm, &q_rank);
       MPI_Comm_size(q_comm, &q_size);
@@ -223,9 +229,11 @@ namespace green::gpu {
       ztensor<4> P0Q_tsab(_nts, _ns, _NQ, _NQ); //intermediate step: P0 for a given Q 
       _mem_mgr.register_memory("sigma_tau k",global_rank_,Sigmak_tsij.size()*sizeof(std::complex<prec>));
       _mem_mgr.register_memory("P_tau Q",global_rank_,P0Q_tsab.size()*sizeof(std::complex<prec>));
-      if(shmem_rank_==0)
-        std::cerr<<_mem_mgr<<std::endl;
-
+      if(shmem_rank_==0){
+        std::cout<<"memory manager node zero: "<<std::endl;
+        std::cout<<_mem_mgr<<std::endl;
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
 
       /*
 
@@ -468,6 +476,61 @@ exit(-1); //not implemented.
     size_t k1 = k[0];
     size_t k1q = k[3];
     _coul_int->read_integrals(k1, k1q);
+  }
+
+  void gw_gpu_kernel::nt_batch_heuristics(std::size_t &target_ntbatch, std::size_t &target_nqkpts){
+    //users tend to not choose nt_batch properly. Priority is as follows:
+    //1. Want at least 6 qkpts (so as to enable parallel runs and integral buffering)
+    //2. Want ntbatch as big as possible. (so as to enable batched calls)
+    //3. Don't want more than 32 kpts
+    std::size_t device_memory;
+    std::size_t available_memory;
+    cudaMemGetInfo(&available_memory, &device_memory);
+    double tol_factor=0.9;
+    double min_nqkpts=6;
+    std::size_t target_mem=tol_factor/min_nqkpts*device_memory; //do not use all of device memory, allow for some overhead (90%). Then target 6 processes
+    std::cout<<"target mem: "<<target_mem/1024./1024/1024.<<" GB"<<std::endl;
+ 
+    /*size of a kpt on the GPU: 
+     (2 * naux * nao * nao               // V_Qpm+V_pmQ
+     + naux * naux * nt_batch           // local copy of P
+     + 2 * nt_batch * naux * nao * nao  // X1 and X2
+     + 3 * ns * nt * nao * nao          // sigmak_stij, g_stij, g_smtij
+     ) * sizeof(cuda_complex);
+     task: find the optimal nt_batch*/
+
+     std::size_t floatbytes=_sp?sizeof(std::complex<float>):sizeof(std::complex<double>);
+     std::size_t fixed_mem=(2 * _NQ* _nao * _nao+ 3 * _ns * _nts * _nao * _nao)* floatbytes;
+     if(global_rank_==0) std::cout<<"fixed mem: "<<fixed_mem/1024./1024.<<" MB"<<std::endl;
+     if(target_mem<fixed_mem) throw std::runtime_error("this GPU does not have enough memory");
+     std::size_t size_per_nt=(2 * _NQ* _nao * _nao+_NQ* _NQ)*floatbytes;
+     if(global_rank_==0) std::cout<<"size per nt: "<<size_per_nt/1024./1024.<<" MB"<<std::endl;
+     std::size_t nt_batch=(target_mem-fixed_mem)/size_per_nt;
+     if(global_rank_==0) std::cout<<"computed nt_batch: "<<nt_batch<<std::endl;
+     if(nt_batch==0) throw std::runtime_error("this GPU does not have enough memory for the calculation");
+     if(nt_batch<=4 && global_rank_==0) std::cerr<<"warning: very small batch size"<<std::endl;
+     if(nt_batch>=_nts) nt_batch=_nts; //best case scenario: we have space for lots of kpts
+     if(global_rank_==0) std::cout<<"adjusted nt_batch: "<<nt_batch<<std::endl;
+   
+
+     std::size_t qkpt_size=(2 * _NQ* _nao * _nao               // V_Qpm+V_pmQ
+     + _NQ* _NQ* nt_batch           // local copy of P
+     + 2 * nt_batch * _NQ* _nao * _nao  // X1 and X2
+     + 3 * _ns * _nts * _nao * _nao          // sigmak_stij, g_stij, g_smtij
+     ) * floatbytes;
+    
+     if(global_rank_==0) std::cout<<"fixed component: "<<(2 * _NQ* _nao * _nao +3 * _ns * _nts * _nao * _nao)* floatbytes/1024./1024.<<" MB"<<std::endl; 
+     if(global_rank_==0) std::cout<<"ntb   component: "<<( _NQ* _NQ* nt_batch+2 * nt_batch * _NQ* _nao * _nao)* floatbytes/1024./1024.<<" MB"<<std::endl; 
+     if(global_rank_==0) std::cout<<"correct qkpt size: "<<qkpt_size/1024./1024.<<" MB"<<std::endl;
+
+
+     std::size_t nqkpts=(tol_factor*device_memory)/qkpt_size;
+     if(global_rank_==0) std::cout<<"nqkpts: "<<nqkpts<<std::endl;
+     if(nqkpts>32) nqkpts=32;
+     if(global_rank_==0) std::cout<<"corrected nqkpts: "<<nqkpts<<std::endl;
+
+     target_ntbatch=nt_batch;
+     target_nqkpts=nqkpts;
   }
 
 } // namespace mbpt

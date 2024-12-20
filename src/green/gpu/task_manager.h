@@ -8,6 +8,7 @@ struct task_t{
   int cycle;
   int q;
   int k;
+  int taskidx;
   int active_core_on_node;
   int gpu;
   bool idle;
@@ -30,6 +31,7 @@ static std::vector<std::vector<task_t> > define_tasks(int inQ, int nK, int nNode
       parallel_q_nbatch=nNodes*nCores_per_node/(inQ-startq);
       parallel_q_njobs=(inQ-startq);
     }
+    for(int taskidx=0;taskidx<2;++taskidx){ //first and second tasks: compute P0 from g and compute sigma from P
     for(int startk=0; startk<nK;startk+=parallel_q_nbatch){
       int kstep=std::max(parallel_q_nbatch/(nK-startk), 1);
       if(verbose>=4)
@@ -49,6 +51,7 @@ static std::vector<std::vector<task_t> > define_tasks(int inQ, int nK, int nNode
             task_info[cycle][idx].k=k_this_core;
             task_info[cycle][idx].active_core_on_node=active_core_on_node;
             task_info[cycle][idx].gpu=active_core_on_node%nGPUs;
+            task_info[cycle][idx].taskidx=taskidx;
           }
           if(k_this_core>=nK){ task_info[cycle][idx].idle=true;  nidle++; continue;}
           if(q_this_core>=inQ){task_info[cycle][idx].idle=true; nidle++; continue;}
@@ -60,6 +63,7 @@ static std::vector<std::vector<task_t> > define_tasks(int inQ, int nK, int nNode
         }
       }
       cycle++;
+    }
     }
   }
   std::cout<<"total: "<<ntotal<<" should be: "<<inQ*nK<<std::endl;

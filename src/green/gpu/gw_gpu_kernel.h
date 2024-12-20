@@ -63,10 +63,12 @@ namespace green::gpu {
         gpu_kernel(p, nao, nso, ns, NQ, bz_utils), _beta(p["BETA"]), _nts(ft.sd().repn_fermi().nts()),
         _nts_b(ft.sd().repn_bose().nts()), _ni(ft.sd().repn_fermi().ni()), _ni_b(ft.sd().repn_bose().ni()),
         _nw(ft.sd().repn_fermi().nw()), _nw_b(ft.sd().repn_bose().nw()), _sp(p["P_sp"].as<bool>() && p["Sigma_sp"].as<bool>()),
-        _ft(ft), _nt_batch(p["nt_batch"]), _path(p["dfintegral_file"]), _cuda_lin_solver(cuda_lin_solver) {
+        _ft(ft), _path(p["dfintegral_file"]), _cuda_lin_solver(cuda_lin_solver) {
       // Check if nts is an even number since we will take the advantage of Pq0(beta-t) = Pq0(t) later
       if (_nts % 2 != 0) throw std::runtime_error("Number of tau points should be even");
 
+      nt_batch_heuristics(_nt_batch, _nqkpts);
+    
 
       //initialize global and shmem ranks and size
       MPI_Comm_rank(MPI_COMM_WORLD, &global_rank_);
@@ -75,6 +77,10 @@ namespace green::gpu {
       MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,global_rank_,info,&shmem_comm_);
       MPI_Comm_size(shmem_comm_,&shmem_size_);
       MPI_Comm_rank(shmem_comm_,&shmem_rank_);
+
+      if(global_rank_==0){
+        std::cout<<"heuristic recommends: nt_batch: "<<_nt_batch<<" nqkpts: "<<_nqkpts<<std::endl;
+      }
     }
 
     /**
@@ -106,6 +112,9 @@ namespace green::gpu {
      */
     void print_effective_flops();
 
+
+    void nt_batch_heuristics(size_t &nt_batch, std::size_t &nqkpts);
+
     double                      _beta;
     size_t                      _nts;
     size_t                      _nts_b;
@@ -117,11 +126,12 @@ namespace green::gpu {
     const grids::transformer_t& _ft;
 
     size_t                      _nt_batch;
+    size_t                      _nqkpts; //supersedes nqkpt{} adjusted in heuristics
 
     const std::string           _path;
     bool                        _sp;
 
-    int                         _nqkpt{};
+    int                         _nqkpt{}; //->deprecated remove
 
     double                      _flop_count{};
     double                      _eff_flops{};
