@@ -66,9 +66,11 @@ static std::vector<std::vector<task_t> > define_tasks(int inQ, int nK, int nNode
     }
     }
   }
-  std::cout<<"total: "<<ntotal<<" should be: "<<inQ*nK<<std::endl;
-  std::cout<<"w idle: "<<ntotal+nidle<<" should be: "<<cycle*nNodes*nCores_per_node<<std::endl;
-  std::cout<<"cycles: "<<cycle<<" total: "<<ntotal<<" idle: "<<nidle<<std::endl;
+  if(ntotal!=inQ*nK*2) throw std::logic_error("problem with task assignment (total).");
+  if(ntotal+nidle!=cycle*nNodes*nCores_per_node) throw std::logic_error("problem with task assignment (total+idle).");
+  if(verbose>=4){
+    std::cout<<"cycles: "<<cycle<<" total: "<<ntotal<<" idle: "<<nidle<<std::endl;
+  }
   return task_info;
 }
 };

@@ -29,6 +29,7 @@
 #include "cublas_routines_prec.h"
 #include "cuda_common.h"
 #include "cugw_qpt.h"
+#include "task_manager.h"
 
 __global__ void initialize_array(cuDoubleComplex* array, cuDoubleComplex value, int count);
 
@@ -133,37 +134,53 @@ namespace green::gpu {
     using cxx_complex  = typename cu_type_map<std::complex<prec>>::cxx_type;
     using cuda_complex = typename cu_type_map<std::complex<prec>>::cuda_type;
 
-  public:
-    cugw_utils(int _nts, int _nt_batch, int _nw_b, int _ns, int _nk, int _ink, int _nqkpt, int _NQ, int _nao,
-               ztensor_view<5>& G_tskij_host, bool _low_device_memory, const MatrixXcd& Ttn_FB, const MatrixXcd& Tnt_BF,
-               LinearSolverType cuda_lin_solver, int _myid, int _intranode_rank, int _devCount_per_node);
+    using ptensor3 = green::ndarray::ndarray<std::complex<prec>, 3>;
+    using ptensor4 = green::ndarray::ndarray<std::complex<prec>, 4>;
 
+  public:
+    cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task);
     ~cugw_utils();
 
-    void solve(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
+    void solve_g_to_P0(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
                const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij, ztensor<5>& Sigma_tskij_host,
-               int _devices_rank, int _devices_size, bool _low_device_memory, int verbose, irre_pos_callback& irre_pos,
+               int _devices_rank, int _devices_size, int verbose, irre_pos_callback& irre_pos,
+               mom_cons_callback& momentum_conservation, gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2);
+    void solve_P_to_sigma(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
+               const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij, ztensor<5>& Sigma_tskij_host,
+               int _devices_rank, int _devices_size, int verbose, irre_pos_callback& irre_pos,
                mom_cons_callback& momentum_conservation, gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2);
 
   private:
     void copy_Sigma(ztensor<5>& Sigma_tskij_host, tensor<std::complex<prec>, 4>& Sigmak_stij, int k, int nts, int ns);
     void copy_Sigma_2c(ztensor<5>& Sigma_tskij_host, tensor<std::complex<prec>, 4>& Sigmak_4tij, int k, int nts);
 
-    //
+    const int _nts;
+    const int _nt_batch;
+    const int _nw_b;
+    const int _ns;
+    const int _nk;
+    const int _ink;
+    const int _nqkpt;
+    const int _NQ;
+    const int _nao;
 
     bool                           _X2C;
-    bool                           _low_device_memory;
     cublasHandle_t                 _handle;
     cusolverDnHandle_t             _solver_handle;
 
-    gw_qpt<prec>                   qpt;
-    std::vector<gw_qkpt<prec>*>    qkpts;
+    //memory of these tensors will be cuda pinned for GPU transfer
+    ptensor3 V_Qpm;
+    ptensor3 V_Qim;
+    ptensor4 Gk1_stij;
+    ptensor4 Gk_smtij;
+    ptensor4 Sigmak_stij; // = Gk_smtij;
 
-    tensor<std::complex<prec>, 3>  V_Qpm;
-    tensor<std::complex<prec>, 3>  V_Qim;
-    tensor<std::complex<prec>, 4>  Gk1_stij;
-    tensor<std::complex<prec>, 4>  Gk_smtij;
-    tensor<std::complex<prec>, 4>& Sigmak_stij = Gk_smtij;
+    //pinned memory pointer
+    std::complex<prec> *V_Qpm_hostptr;
+    std::complex<prec> *V_Qim_hostptr;
+    std::complex<prec> *Gk1_stij_hostptr;
+    std::complex<prec> *Gk_smtij_hostptr;
+    std::complex<prec> *Sigmak_stij_hostptr;
 
     cuda_complex*                  g_kstij_device;
     cuda_complex*                  g_ksmtij_device;

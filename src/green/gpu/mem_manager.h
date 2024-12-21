@@ -97,9 +97,10 @@ inline std::ostream &operator<<(std::ostream &os, const mem_manager &mgr){
   else
     os<<"# actual mem used: \t"<<mgr.poll_mem_usage()/GB<<" GB"<<std::endl;
   //if this comes close to 1 we are using too much memory
-  os<<"# actual mem div hardware mem  : "<<(double)actual_mem/mgr.total_memory()<<std::endl;
+  os<<"# actual     mem div hardware mem  : "<<(double)actual_mem/mgr.total_memory()<<std::endl;
   //if this is far from 1 we substantial memory we did not register
-  os<<"# registered mem div actual mem: "<<(double)mgr.registered_memory()/(double)actual_mem<<std::endl;
+  os<<"# registered mem div actual   mem: "<<(double)mgr.registered_memory()/(double)actual_mem<<std::endl;
+  os<<"# registered mem div hardware mem: "<<(double)mgr.registered_memory()/(double)mgr.total_memory()<<std::endl;
   os<<"##########################################################";
   return os;
 }

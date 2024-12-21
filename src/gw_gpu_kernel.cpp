@@ -105,7 +105,8 @@ namespace green::gpu {
       }
       MPI_Barrier(utils::context.global);
       int task_verbose=2;
-      tasks_=task_t::define_tasks(_ink, _nk, global_size_/shmem_size_, shmem_size_,_devices_size , task_verbose);
+      int nGPUs; cudaGetDeviceCount(&nGPUs);
+      tasks_=task_t::define_tasks(_ink, _nk, global_size_/shmem_size_, shmem_size_, nGPUs, task_verbose);
       statistics.end(); //end of Initialization epoch
 
 
@@ -235,15 +236,13 @@ namespace green::gpu {
       }
       MPI_Barrier(MPI_COMM_WORLD);
 
-      /*
-
-      GW_check_devices_free_space();
+      //GW_check_devices_free_space();
       statistics.start("Initialization");
-      cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, g.object(), _low_device_memory,
-                            _ft.Ttn_FB(), _ft.Tnt_BF(), _cuda_lin_solver, utils::context.global_rank, utils::context.node_rank,
-                            _devCount_per_node);
+      cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task);
+
+
       statistics.end();
-      // As we move evaluation into a GPU
+/*      // As we move evaluation into a GPU
       irre_pos_callback irre_pos = [&](size_t k) -> size_t {return _bz_utils.symmetry().reduced_to_full()[k];};
       mom_cons_callback mom_cons = [&](const std::array<size_t, 3> &k123) -> const std::array<size_t, 4> {return _bz_utils.momentum_conservation(k123);};
       gw_reader1_callback<prec> r1 = [&](int k, int k1, int k_reduced_id, int k1_reduced_id, const std::array<size_t, 4>& k_vector,
@@ -356,7 +355,7 @@ namespace green::gpu {
 
 exit(-1); //not implemented.
 
-      // check devices' free space and space requirements
+/*      // check devices' free space and space requirements
       GW_check_devices_free_space();
       statistics.start("Initialization");
       // Reuse the non-relativistic functions with pseudo spin = 4, the aa, bb, ab, ba blocks.
@@ -413,7 +412,7 @@ exit(-1); //not implemented.
       // Copy back to Sigma_tskij_local_host
       MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, sigma_tau.win());
       sigma_tau.object() += Sigma_tskij_host_local;
-      MPI_Win_unlock(0, sigma_tau.win());
+      MPI_Win_unlock(0, sigma_tau.win());*/
     }
 
     void x2c_gw_gpu_kernel::copy_Gk_2c(const ztensor<5> &G_tskij_host, tensor<std::complex<double>,4> &Gk_4tij, int k, bool need_minus_k, bool minus_t) {
@@ -489,7 +488,7 @@ exit(-1); //not implemented.
     double tol_factor=0.9;
     double min_nqkpts=6;
     std::size_t target_mem=tol_factor/min_nqkpts*device_memory; //do not use all of device memory, allow for some overhead (90%). Then target 6 processes
-    std::cout<<"target mem: "<<target_mem/1024./1024/1024.<<" GB"<<std::endl;
+    if(_verbose>4 && global_rank_==0) std::cout<<"target mem: "<<target_mem/1024./1024/1024.<<" GB"<<std::endl;
  
     /*size of a kpt on the GPU: 
      (2 * naux * nao * nao               // V_Qpm+V_pmQ
@@ -501,16 +500,16 @@ exit(-1); //not implemented.
 
      std::size_t floatbytes=_sp?sizeof(std::complex<float>):sizeof(std::complex<double>);
      std::size_t fixed_mem=(2 * _NQ* _nao * _nao+ 3 * _ns * _nts * _nao * _nao)* floatbytes;
-     if(global_rank_==0) std::cout<<"fixed mem: "<<fixed_mem/1024./1024.<<" MB"<<std::endl;
+     if(_verbose>4 && global_rank_==0) std::cout<<"fixed mem: "<<fixed_mem/1024./1024.<<" MB"<<std::endl;
      if(target_mem<fixed_mem) throw std::runtime_error("this GPU does not have enough memory");
      std::size_t size_per_nt=(2 * _NQ* _nao * _nao+_NQ* _NQ)*floatbytes;
-     if(global_rank_==0) std::cout<<"size per nt: "<<size_per_nt/1024./1024.<<" MB"<<std::endl;
+     if(_verbose>4 && global_rank_==0) std::cout<<"size per nt: "<<size_per_nt/1024./1024.<<" MB"<<std::endl;
      std::size_t nt_batch=(target_mem-fixed_mem)/size_per_nt;
-     if(global_rank_==0) std::cout<<"computed nt_batch: "<<nt_batch<<std::endl;
+     if(_verbose>4 &&  global_rank_==0) std::cout<<"computed nt_batch: "<<nt_batch<<std::endl;
      if(nt_batch==0) throw std::runtime_error("this GPU does not have enough memory for the calculation");
      if(nt_batch<=4 && global_rank_==0) std::cerr<<"warning: very small batch size"<<std::endl;
      if(nt_batch>=_nts) nt_batch=_nts; //best case scenario: we have space for lots of kpts
-     if(global_rank_==0) std::cout<<"adjusted nt_batch: "<<nt_batch<<std::endl;
+     if(_verbose>4 && global_rank_==0) std::cout<<"adjusted nt_batch: "<<nt_batch<<std::endl;
    
 
      std::size_t qkpt_size=(2 * _NQ* _nao * _nao               // V_Qpm+V_pmQ
@@ -519,15 +518,15 @@ exit(-1); //not implemented.
      + 3 * _ns * _nts * _nao * _nao          // sigmak_stij, g_stij, g_smtij
      ) * floatbytes;
     
-     if(global_rank_==0) std::cout<<"fixed component: "<<(2 * _NQ* _nao * _nao +3 * _ns * _nts * _nao * _nao)* floatbytes/1024./1024.<<" MB"<<std::endl; 
-     if(global_rank_==0) std::cout<<"ntb   component: "<<( _NQ* _NQ* nt_batch+2 * nt_batch * _NQ* _nao * _nao)* floatbytes/1024./1024.<<" MB"<<std::endl; 
-     if(global_rank_==0) std::cout<<"correct qkpt size: "<<qkpt_size/1024./1024.<<" MB"<<std::endl;
+     if(_verbose>4 && global_rank_==0) std::cout<<"fixed component: "<<(2 * _NQ* _nao * _nao +3 * _ns * _nts * _nao * _nao)* floatbytes/1024./1024.<<" MB"<<std::endl; 
+     if(_verbose>4 && global_rank_==0) std::cout<<"ntb   component: "<<( _NQ* _NQ* nt_batch+2 * nt_batch * _NQ* _nao * _nao)* floatbytes/1024./1024.<<" MB"<<std::endl; 
+     if(_verbose>3 && global_rank_==0) std::cout<<"GPU qkpt size: "<<qkpt_size/1024./1024.<<" MB"<<std::endl;
 
 
      std::size_t nqkpts=(tol_factor*device_memory)/qkpt_size;
-     if(global_rank_==0) std::cout<<"nqkpts: "<<nqkpts<<std::endl;
+     if(_verbose>4 && global_rank_==0) std::cout<<"nqkpts: "<<nqkpts<<std::endl;
      if(nqkpts>32) nqkpts=32;
-     if(global_rank_==0) std::cout<<"corrected nqkpts: "<<nqkpts<<std::endl;
+     if(_verbose>4 && global_rank_==0) std::cout<<"corrected nqkpts: "<<nqkpts<<std::endl;
 
      target_ntbatch=nt_batch;
      target_nqkpts=nqkpts;

@@ -165,54 +165,54 @@ namespace green::gpu {
   }
 
   template <typename prec>
-  cugw_utils<prec>::cugw_utils(int _nts, int _nt_batch, int _nw_b, int _ns, int _nk, int _ink, int _nqkpt, int _NQ, int _nao,
-                               ztensor_view<5>& G_tskij_host, bool low_device_memory, const MatrixXcd& Ttn_FB,
-                               const MatrixXcd& Tnt_BF, LinearSolverType cuda_lin_solver, int _myid, int _intranode_rank,
-                               int _devCount_per_node) :
-      _low_device_memory(low_device_memory), qkpts(_nqkpt), V_Qpm(_NQ, _nao, _nao), V_Qim(_NQ, _nao, _nao),
-      Gk1_stij(_ns, _nts, _nao, _nao), Gk_smtij(_ns, _nts, _nao, _nao),
-      qpt(_nao, _NQ, _nts, _nw_b, Ttn_FB.data(), Tnt_BF.data(), cuda_lin_solver) {
-    if (cudaSetDevice(_intranode_rank % _devCount_per_node) != cudaSuccess) throw std::runtime_error("Error in cudaSetDevice2");
+    cugw_utils<prec>::cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task):
+      _nts(nts),
+      _nt_batch(nt_batch),
+      _nw_b(nw_b),
+      _ns(ns),
+      _nk(nk),
+      _ink(ink), 
+      _nqkpt(nqkpt), 
+      _NQ(NQ), 
+      _nao(nao),
+      V_Qpm(nullptr, _NQ, _nao, _nao),
+      V_Qim(nullptr, _NQ, _nao, _nao),
+      Gk1_stij(nullptr, _ns, _nts, _nao, _nao), 
+      Gk_smtij(nullptr, _nts, _nao, _nao)
+      {
+    //set the proper GPU and initialize cublas solver
+    if (cudaSetDevice(this_task.gpu) != cudaSuccess) throw std::runtime_error("Error in cudaSetDevice2");
     if (cublasCreate(&_handle) != CUBLAS_STATUS_SUCCESS)
-      throw std::runtime_error("Rank " + std::to_string(_myid) + ": error initializing cublas");
-    /*#ifdef ENABLE_TENSOR_CORE
-          ///EXPERIMENTAL: Set the math mode to allow cuBLAS to use Tensor Cores:
-          cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH);
-    #endif*/
-    if (cusolverDnCreate(&_solver_handle) != CUSOLVER_STATUS_SUCCESS)
-      throw std::runtime_error("Rank " + std::to_string(_myid) + ": cusolver init problem");
+      throw std::runtime_error("Node " + std::to_string(this_task.node)+"Core" + std::to_string(this_task.core) + ": error initializing cublas");
 
     // initialize and transfer device green's function, self-energy and IR matrices
-    _X2C = _ns == 4;
-    if (_X2C and !_low_device_memory)
-      throw std::logic_error("cugw_utils for 2C Hamiltonian in high_device_memory mode is not implemented.");
-    if (!_low_device_memory) {
-      allocate_G_and_Sigma(&g_kstij_device, &g_ksmtij_device, &sigma_kstij_device, G_tskij_host.data(), _ink, _nao, _nts, _ns);
-    } else {
-      sigma_kstij_device = nullptr;
-      g_kstij_device     = nullptr;
-      g_ksmtij_device    = nullptr;
-    }
+    _X2C = (_ns == 4?true:false);
 
-    // locks so that different threads don't write the results over each other
-    cudaMalloc(&sigma_k_locks, _ink * sizeof(int));
-    cudaMemset(sigma_k_locks, 0, _ink * sizeof(int));
+    //allocate host memory for GPU transfer 
+    if (cudaMallocHost(&V_Qpm_hostptr, _NQ* _nao*_nao* sizeof(cuda_complex),cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate V_Qpm_ptr");
+    if (cudaMallocHost(&V_Qim_hostptr, _NQ* _nao*_nao* sizeof(cuda_complex),cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate V_Qim_ptr");
+    if (cudaMallocHost(&Gk1_stij_hostptr, _ns*_nts*_nao*_nao* sizeof(cuda_complex),cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate Gk1_stij_ptr");
+    if (cudaMallocHost(&Gk_smtij_hostptr, _ns*_nts*_nao*_nao* sizeof(cuda_complex), cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate Gk_smtij_ptr");
+ 
+    //allocate host matrix wrappers around host pointers
+    V_Qpm.set_ref(V_Qpm_hostptr);
+    V_Qim.set_ref(V_Qim_hostptr);
+    Gk1_stij.set_ref(Gk1_stij_hostptr);
+    Gk_smtij.set_ref(Gk_smtij_hostptr);
 
-    qpt.init(&_handle, &_solver_handle);
-    // Each process gets one cuda runner for qpoints
-    for (int i = 0; i < _nqkpt; ++i) {
-      qkpts[i] = new gw_qkpt<prec>(_nao, _NQ, _ns, _nts, _nt_batch, &_handle, g_kstij_device, g_ksmtij_device, sigma_kstij_device,
-                                   sigma_k_locks);
-    }
+    sigma_kstij_device = nullptr;
+    g_kstij_device     = nullptr;
+    g_ksmtij_device    = nullptr;
+
   }
 
   template <typename prec>
-  void cugw_utils<prec>::solve(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
+  void cugw_utils<prec>::solve_g_to_P0(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
                                const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij,
-                               ztensor<5>& Sigma_tskij_host, int _devices_rank, int _devices_size, bool low_device_memory,
+                               ztensor<5>& Sigma_tskij_host, int _devices_rank, int _devices_size,
                                int verbose, irre_pos_callback& irre_pos, mom_cons_callback& momentum_conservation,
                                gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2) {
-    // this is the main GW loop
+/*    // this is the main GW loop
     if (!_devices_rank && verbose > 0) std::cout << "GW main loop" << std::endl;
     qpt.verbose() = verbose;
 
@@ -291,21 +291,21 @@ namespace green::gpu {
     cudaDeviceSynchronize();
     if (!_low_device_memory and !_X2C) {
       copy_Sigma_from_device_to_host(sigma_kstij_device, Sigma_tskij_host.data(), _ink, _nao, _nts, _ns);
-    }
+    }*/
   }
 
   template <typename prec>
   void cugw_utils<prec>::copy_Sigma(ztensor<5>& Sigma_tskij_host, tensor<std::complex<prec>, 4>& Sigmak_stij, int k, int nts,
                                     int ns) {
-    for (size_t t = 0; t < nts; ++t) {
+    /*for (size_t t = 0; t < nts; ++t) {
       for (size_t s = 0; s < ns; ++s) {
         matrix(Sigma_tskij_host(t, s, k)) += matrix(Sigmak_stij(s, t)).template cast<typename std::complex<double>>();
       }
-    }
+    }*/
   }
   template <typename prec>
   void cugw_utils<prec>::copy_Sigma_2c(ztensor<5>& Sigma_tskij_host, tensor<std::complex<prec>, 4>& Sigmak_4tij, int k, int nts) {
-    size_t    nao = Sigmak_4tij.shape()[3];
+    /*size_t    nao = Sigmak_4tij.shape()[3];
     size_t    nso = 2 * nao;
     MatrixXcf Sigma_ij(nso, nso);
     for (size_t ss = 0; ss < 3; ++ss) {
@@ -321,20 +321,16 @@ namespace green::gpu {
               matrix(Sigmak_4tij(ss, t)).conjugate().transpose().template cast<typename std::complex<double>>();
         }
       }
-    }
+    }*/
   }
 
   template <typename prec>
   cugw_utils<prec>::~cugw_utils() {
-    for (int i = 0; i < qkpts.size(); ++i) {
-      delete qkpts[i];
-    }
     if (cublasDestroy(_handle) != CUBLAS_STATUS_SUCCESS) throw std::runtime_error("cublas error destroying handle");
-    if (cusolverDnDestroy(_solver_handle) != CUSOLVER_STATUS_SUCCESS) throw std::runtime_error("culapck error destroying handle");
-    if (!_low_device_memory) cudaFree(g_kstij_device);
-    if (!_low_device_memory) cudaFree(g_ksmtij_device);
-    cudaFree(sigma_kstij_device);
-    cudaFree(sigma_k_locks);
+    cudaFreeHost(V_Qpm_hostptr);
+    cudaFreeHost(V_Qim_hostptr);
+    cudaFreeHost(Gk1_stij_hostptr);
+    cudaFreeHost(Gk_smtij_hostptr);
   }
 
   template class cugw_utils<float>;
