@@ -19,7 +19,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <green/gpu/cu_routines.h>
+#include <green/gpu/cugw.h>
 
 namespace green::gpu {
   template <typename prec>

@@ -19,7 +19,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <green/gpu/cu_routines.h>
+#include <green/gpu/cuhf.h>
 
 __global__ void initialize_array(cuDoubleComplex* array, cuDoubleComplex value, int count) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;

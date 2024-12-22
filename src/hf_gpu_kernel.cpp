@@ -19,14 +19,14 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <green/gpu/cu_routines.h>
+#include <green/gpu/cuhf.h>
 #include <green/gpu/hf_gpu_kernel.h>
 
 namespace green::gpu {
   void hf_gpu_kernel::HF_check_devices_free_space() {
     std::cout << std::setprecision(4) << std::boolalpha;
     // check devices' free space and determine nkbatch
-    std::size_t hf_utils_size = cuhf_utils::size_divided_by_kbatch(_nao, _NQ);
+    std::size_t hf_utils_size = cuhf::size_divided_by_kbatch(_nao, _NQ);
     std::size_t available_memory;
     std::size_t total_memory;
     cudaMemGetInfo(&available_memory, &total_memory);
@@ -110,7 +110,7 @@ namespace green::gpu {
     // Also determines _nk_batch
     HF_check_devices_free_space();
     // Each process gets one cuda runner hf_utils
-    cuhf_utils hf_utils(_nk, _ink, _ns, _nao, _NQ, _nk_batch, dm_fbz, utils::context.global_rank, utils::context.node_rank,
+    cuhf hf_utils(_nk, _ink, _ns, _nao, _NQ, _nk_batch, dm_fbz, utils::context.global_rank, utils::context.node_rank,
                         _devCount_per_node);
 
     statistics.end();
@@ -246,7 +246,7 @@ namespace green::gpu {
     // Each NxN AO block of the 2-component exchange potential is evalulated individually
     // using the non-relativistic functions with pseudo spin = 3 (i.e. aa, bb, ab blocks)
     int pseudo_ns = 3;
-    cuhf_utils hf_utils(_nk, _ink, pseudo_ns, _nao, _NQ, _nk_batch, dm_fbz_3kij, utils::context.global_rank, utils::context.node_rank, _devCount_per_node);
+    cuhf hf_utils(_nk, _ink, pseudo_ns, _nao, _NQ, _nk_batch, dm_fbz_3kij, utils::context.global_rank, utils::context.node_rank, _devCount_per_node);
     statistics.end();
     MPI_Barrier(_devices_comm);
 

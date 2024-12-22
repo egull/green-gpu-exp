@@ -19,7 +19,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <green/gpu/cu_routines.h>
+#include <green/gpu/cugw.h>
 #include <green/gpu/cuda_common.h>
 #include <green/gpu/gw_gpu_kernel.h>
 #include <green/integrals/df_integral_t.h>
@@ -238,7 +238,7 @@ namespace green::gpu {
 
       //GW_check_devices_free_space();
       statistics.start("Initialization");
-      cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task, &_mem_mgr);
+      cugw<prec> gw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task, &_mem_mgr);
 
 
       statistics.end();

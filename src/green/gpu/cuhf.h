@@ -19,8 +19,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef GREEN_GPU_CU_ROUTINES_H
-#define GREEN_GPU_CU_ROUTINES_H
+#ifndef GREEN_GPU_CUHF
+#define GREEN_GPU_CUHF
 #include <green/gpu/common_defs.h>
 #include <green/integrals/common_defs_e.h>
 
@@ -52,16 +52,16 @@ namespace green::gpu {
   /**
    * \brief utilities to run Hartree-Fock on GPUs
    */
-  class cuhf_utils {
+  class cuhf {
     using scalar_t     = typename cu_type_map<std::complex<double>>::cxx_base_type;
     using cxx_complex  = typename cu_type_map<std::complex<double>>::cxx_type;
     using cuda_complex = typename cu_type_map<std::complex<double>>::cuda_type;
 
   public:
-    cuhf_utils(size_t nk, size_t ink, size_t ns, size_t nao, size_t NQ, size_t nkbatch, ztensor<4> dm_fbz, int _myid,
+    cuhf(size_t nk, size_t ink, size_t ns, size_t nao, size_t NQ, size_t nkbatch, ztensor<4> dm_fbz, int _myid,
                int _intranode_rank, int _devCount_per_node);
 
-    ~cuhf_utils();
+    ~cuhf();
 
     static std::size_t size_divided_by_kbatch(size_t nao, size_t naux) {
       return (4 * naux * nao * nao + nao * nao) * sizeof(cuda_complex);
@@ -129,71 +129,6 @@ namespace green::gpu {
     cublasHandle_t _handle;
   };
 
-  template <typename prec>
-  class cugw_utils {
-    using scalar_t     = typename cu_type_map<std::complex<prec>>::cxx_base_type;
-    using cxx_complex  = typename cu_type_map<std::complex<prec>>::cxx_type;
-    using cuda_complex = typename cu_type_map<std::complex<prec>>::cuda_type;
-
-    using ptensor3 = green::ndarray::ndarray<std::complex<prec>, 3>;
-    using ptensor4 = green::ndarray::ndarray<std::complex<prec>, 4>;
-
-  public:
-    cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task, mem_manager *mem_mgr_);
-    ~cugw_utils();
-
-    void solve_g_to_P0(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
-               const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij, ztensor<5>& Sigma_tskij_host,
-               int _devices_rank, int _devices_size, int verbose, irre_pos_callback& irre_pos,
-               mom_cons_callback& momentum_conservation, gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2);
-    void solve_P_to_sigma(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
-               const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij, ztensor<5>& Sigma_tskij_host,
-               int _devices_rank, int _devices_size, int verbose, irre_pos_callback& irre_pos,
-               mom_cons_callback& momentum_conservation, gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2);
-
-  private:
-    void copy_Sigma(ztensor<5>& Sigma_tskij_host, tensor<std::complex<prec>, 4>& Sigmak_stij, int k, int nts, int ns);
-    void copy_Sigma_2c(ztensor<5>& Sigma_tskij_host, tensor<std::complex<prec>, 4>& Sigmak_4tij, int k, int nts);
-
-    const int _nts;
-    const int _nt_batch;
-    const int _nw_b;
-    const int _ns;
-    const int _nk;
-    const int _ink;
-    const int _nqkpt;
-    const int _NQ;
-    const int _nao;
-
-    bool                           _X2C;
-    cublasHandle_t                 _handle;
-    cusolverDnHandle_t             _solver_handle;
-
-    //memory of these tensors will be cuda pinned for GPU transfer
-    ptensor3 V_Qpm;
-    ptensor3 V_Qim;
-    ptensor4 Gk1_stij;
-    ptensor4 Gk_smtij;
-    ptensor4 Sigmak_stij; // = Gk_smtij;
-    ptensor4 PQ_stab; // = Gk_smtij;
-
-    mem_manager *mem_mgr_; //pointer to node-local memory manager to keep track of mem used
-
-    //pinned memory pointer
-    std::complex<prec> *V_Qpm_hostptr;
-    std::complex<prec> *V_Qim_hostptr;
-    std::complex<prec> *Gk1_stij_hostptr;
-    std::complex<prec> *Gk_smtij_hostptr;
-    std::complex<prec> *Sigmak_stij_hostptr; //will use memory of Gk1
-    std::complex<prec> *PQ_stab_hostptr;
-    std::complex<prec> *P0Q_stab_hostptr;  //will use memory of PQ
-
-    cuda_complex*                  g_kstij_device;
-    cuda_complex*                  g_ksmtij_device;
-    cuda_complex*                  sigma_kstij_device;
-
-    int*                           sigma_k_locks;
-  };
 }  // namespace green::gpu
 
 #endif  // GREEN_GPU_CU_ROUTINES_H

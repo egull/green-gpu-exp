@@ -44,6 +44,7 @@ namespace green::gpu {
   using irre_pos_callback   = std::function<size_t(size_t)>;
   using mom_cons_callback   = std::function<const std::array<size_t, 4>(const std::array<size_t, 3>&)>;
 
+  template <typename prec>
   class cugw {
     using scalar_t     = typename cu_type_map<std::complex<prec>>::cxx_base_type;
     using cxx_complex  = typename cu_type_map<std::complex<prec>>::cxx_type;
