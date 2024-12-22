@@ -57,10 +57,10 @@ namespace green::gpu {
     cugw(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task, mem_manager *mem_mgr_);
     ~cugw();
 
-    void solve_g_to_P0(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
+    void solve_g_to_P0();/*int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
                const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij, ztensor<5>& Sigma_tskij_host,
                int _devices_rank, int _devices_size, int verbose, irre_pos_callback& irre_pos,
-               mom_cons_callback& momentum_conservation, gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2);
+               mom_cons_callback& momentum_conservation, gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2);*/
     void solve_P_to_sigma(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
                const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij, ztensor<5>& Sigma_tskij_host,
                int _devices_rank, int _devices_size, int verbose, irre_pos_callback& irre_pos,
@@ -85,13 +85,15 @@ namespace green::gpu {
     cusolverDnHandle_t             _solver_handle;
 
     //memory of these tensors will be cuda pinned for GPU transfer
+public:
     ptensor3 V_Qpm;
     ptensor3 V_Qim;
     ptensor4 Gk1_stij;
     ptensor4 Gk_smtij;
     ptensor4 Sigmak_stij; // = Gk_smtij;
-    ptensor4 PQ_stab; // = Gk_smtij;
-
+    ptensor4 PQ_stab; 
+    ptensor4 P0Q_stab; // = PQ_stab
+private:
     mem_manager *mem_mgr_; //pointer to node-local memory manager to keep track of mem used
 
     //pinned memory pointer
@@ -99,9 +101,7 @@ namespace green::gpu {
     std::complex<prec> *V_Qim_hostptr;
     std::complex<prec> *Gk1_stij_hostptr;
     std::complex<prec> *Gk_smtij_hostptr;
-    std::complex<prec> *Sigmak_stij_hostptr; //will use memory of Gk1
     std::complex<prec> *PQ_stab_hostptr;
-    std::complex<prec> *P0Q_stab_hostptr;  //will use memory of PQ
 
     cuda_complex*                  g_kstij_device;
     cuda_complex*                  g_ksmtij_device;

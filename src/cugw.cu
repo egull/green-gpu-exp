@@ -61,6 +61,10 @@ namespace green::gpu {
     V_Qim.set_ref(V_Qim_hostptr);
     Gk1_stij.set_ref(Gk1_stij_hostptr);
     Gk_smtij.set_ref(Gk_smtij_hostptr);
+    Sigmak_stij.set_ref(Gk1_stij_hostptr); //will use memory of Gk1 to save memory
+    PQ_stab.set_ref(PQ_stab_hostptr);
+    P0Q_stab.set_ref(PQ_stab_hostptr);  //will use memory of PQ to save memory
+
     mem_mgr_->register_memory("V_Qpm and V_Qim",this_task.global_rank,2*V_Qpm.size()*sizeof(std::complex<prec>));
     mem_mgr_->register_memory("Gk1_stij, Sigma_stij, and Gk_smtij",this_task.global_rank,2*Gk1_stij.size()*sizeof(std::complex<prec>));
     mem_mgr_->register_memory("P and P0 Q",this_task.global_rank,PQ_stab.size()*sizeof(std::complex<prec>));
@@ -72,11 +76,11 @@ namespace green::gpu {
   }
 
   template <typename prec>
-  void cugw<prec>::solve_g_to_P0(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
+  void cugw<prec>::solve_g_to_P0(){/*int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
                                const std::vector<size_t>& full_to_reduced, std::complex<double>* Vk1k2_Qij,
                                ztensor<5>& Sigma_tskij_host, int _devices_rank, int _devices_size,
                                int verbose, irre_pos_callback& irre_pos, mom_cons_callback& momentum_conservation,
-                               gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2) {
+                               gw_reader1_callback<prec>& r1, gw_reader2_callback<prec>& r2) {*/
 /*    // this is the main GW loop
     if (!_devices_rank && verbose > 0) std::cout << "GW main loop" << std::endl;
     qpt.verbose() = verbose;

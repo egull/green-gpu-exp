@@ -230,62 +230,54 @@ namespace green::gpu {
       ztensor<4> P0Q_tsab(_nts, _ns, _NQ, _NQ); //intermediate step: P0 for a given Q */
       /*_mem_mgr.register_memory("sigma_tau k",global_rank_,Sigmak_tsij.size()*sizeof(std::complex<prec>));
       _mem_mgr.register_memory("P_tau Q",global_rank_,P0Q_tsab.size()*sizeof(std::complex<prec>));*/
-      if(shmem_rank_==0){
-        std::cout<<"memory manager node zero: "<<std::endl;
-        std::cout<<_mem_mgr<<std::endl;
-      }
-      MPI_Barrier(MPI_COMM_WORLD);
 
       //GW_check_devices_free_space();
       statistics.start("Initialization");
       cugw<prec> gw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task, &_mem_mgr);
 
 
+      MPI_Barrier(MPI_COMM_WORLD);
+      if(shmem_rank_==0){
+        std::cout<<"memory manager node zero: "<<std::endl;
+        std::cout<<_mem_mgr<<std::endl;
+      }
       statistics.end();
-/*      // As we move evaluation into a GPU
-      irre_pos_callback irre_pos = [&](size_t k) -> size_t {return _bz_utils.symmetry().reduced_to_full()[k];};
-      mom_cons_callback mom_cons = [&](const std::array<size_t, 3> &k123) -> const std::array<size_t, 4> {return _bz_utils.momentum_conservation(k123);};
-      gw_reader1_callback<prec> r1 = [&](int k, int k1, int k_reduced_id, int k1_reduced_id, const std::array<size_t, 4>& k_vector,
-                                         tensor<std::complex<prec>,3>& V_Qpm, std::complex<double> *Vk1k2_Qij,
-                                         tensor<std::complex<prec>,4>&Gk_smtij, tensor<std::complex<prec>,4>&Gk1_stij,
-                                         bool need_minus_k, bool need_minus_k1) {
+
+      size_t                k             =this_task.k;
+      size_t                q             =this_task.q;
+      std::array<size_t, 4> k_vector      = _bz_utils.momentum_conservation({{k, 0, q}});
+      size_t                k1            = k_vector[3];
+      size_t                k_reduced_id  = _bz_utils.symmetry().full_to_reduced()[k];   // irre_pos(index[k]);
+      size_t                k1_reduced_id = _bz_utils.symmetry().full_to_reduced()[k1];  // irre_pos(index[k1]);
+
+      if(this_task.taskidx==0){
+        //turn two Gs into P0
+        //1. read the integral into V_Qpm
         statistics.start("read");
-        int q = k_vector[2];
-        if (_coul_int_reading_type == green::integrals::read_integrals_in_chunks) {
-          read_next(k_vector);
-          _coul_int->symmetrize(V_Qpm, k, k1);
-        } else {
-          _coul_int->symmetrize(Vk1k2_Qij, V_Qpm, k, k1);
-        }
-        if (_low_device_memory) {
-          copy_Gk(g.object(), Gk_smtij, k_reduced_id, true);
-          copy_Gk(g.object(), Gk1_stij, k1_reduced_id, false);
-        }
+        _coul_int->symmetrize(gw.V_Qpm, k, k1);
         statistics.end();
-      };
-      gw_reader2_callback<prec> r2 = [&](int k, int k1, int k1_reduced_id, const std::array<size_t, 4>& k_vector,
-                                        tensor<std::complex<prec>,3>& V_Qim, std::complex<double> *Vk1k2_Qij,
-                                        tensor<std::complex<prec>,4>&Gk1_stij,
-                                        bool need_minus_k1) {
+        //2. copy Gk and Gk1 into the right places
+        copy_Gk(g.object(), gw.Gk_smtij, k_reduced_id, true);
+        copy_Gk(g.object(), gw.Gk1_stij, k1_reduced_id, false);
+
+        gw.solve_g_to_P0();
+
+
+       }else if(this_task.taskidx==1){
+/*        //turn two G and P into Sigma
         statistics.start("read");
         int q = k_vector[1];
-        if (_coul_int_reading_type == green::integrals::read_integrals_in_chunks) {
-          read_next(k_vector);
-          _coul_int->symmetrize(V_Qim, k, k1);
-        } else {
-          _coul_int->symmetrize(Vk1k2_Qij, V_Qim, k, k1);
-        }
-        if (_low_device_memory) {
-          copy_Gk(g.object(), Gk1_stij, k1_reduced_id, false);
-        }
-        statistics.end();
-      };
+        _coul_int->symmetrize(V_Qim, k, k1);
+        copy_Gk(g.object(), Gk1_stij, k1_reduced_id, false);
+        // -> need to implement this: copy_P(g.object(), Gk1_stij, k1_reduced_id, false);
+        statistics.end();*/
+      }else throw std::runtime_error("wrong task");
 
       // Since all process in _devices_comm will write to the self-energy simultaneously,
       // instaed of adding locks in cugw.solve(), we allocate private _Sigma_tskij_local_host
       // and do MPIAllreduce on CPU later on. Since the number of processes with a GPU is very
       // limited, the additional memory overhead is fairly limited.
-      statistics.start("Solve cuGW");
+      /*statistics.start("Solve cuGW");
       cugw.solve(_nts, _ns, _nk, _ink, _nao, _bz_utils.symmetry().reduced_to_full(), _bz_utils.symmetry().full_to_reduced(),
                  _Vk1k2_Qij, Sigma_tskij_host_local, _devices_rank, _devices_size, _low_device_memory, _verbose,
                  irre_pos, mom_cons, r1, r2);
