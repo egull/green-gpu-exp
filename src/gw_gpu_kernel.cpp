@@ -23,6 +23,7 @@
 #include <green/gpu/cuda_common.h>
 #include <green/gpu/gw_gpu_kernel.h>
 #include <green/integrals/df_integral_t.h>
+#include <green/gpu/gpu_access_counter.h>
 
 namespace green::gpu {
     void scalar_gw_gpu_kernel::complexity_estimation() {
@@ -215,33 +216,43 @@ namespace green::gpu {
       // check devices' free space and space requirements
       task_t this_task=tasks_[cycle][global_rank_];
 
-      //make a communicator with all cores that have the same q.
+      //make a communicator with all cores that have the same q. We need this to collect results
       MPI_Comm q_comm;
       MPI_Comm_split(MPI_COMM_WORLD, this_task.q, this_task.k, &q_comm); //splitting the MPI communicator according to q
-      if(this_task.idle){
-        MPI_Barrier(MPI_COMM_WORLD);
-        return;
-      }
       int q_rank, q_size;
       MPI_Comm_rank(q_comm, &q_rank);
       MPI_Comm_size(q_comm, &q_size);
 
-      /*ztensor<4> Sigmak_tsij(_nts, _ns, _nao, _nao); //end result: sigma for a given k
-      ztensor<4> P0Q_tsab(_nts, _ns, _NQ, _NQ); //intermediate step: P0 for a given Q */
-      /*_mem_mgr.register_memory("sigma_tau k",global_rank_,Sigmak_tsij.size()*sizeof(std::complex<prec>));
-      _mem_mgr.register_memory("P_tau Q",global_rank_,P0Q_tsab.size()*sizeof(std::complex<prec>));*/
+      //make a communicator with all cores that have the share a GPU. We need this to not oversubscribe tasks
+      MPI_Comm gpu_comm;
+      MPI_Comm_split(shmem_comm_, this_task.idle?-1:this_task.gpu, this_task.k, &gpu_comm); //splitting the MPI communicator according to gpu
+      int gpu_rank, gpu_size;
+      MPI_Comm_rank(gpu_comm, &gpu_rank);
+      MPI_Comm_size(gpu_comm, &gpu_size);
+      gpu_access_counter ctr(gpu_comm, _nqkpts);
 
-      //GW_check_devices_free_space();
+      for(int i=0;i<global_size_;++i){
+        MPI_Barrier(MPI_COMM_WORLD);
+        if(global_rank_==i){
+          std::cout<<"global rank: "<<global_rank_<<" q rank: "<<q_rank<<" of: "<<q_size<<" gpu: "<<this_task.gpu<<" gpu_rank: "<<gpu_rank<<" of: "<<gpu_size<<std::endl;
+        }
+      }
+      if(this_task.idle){
+        MPI_Barrier(MPI_COMM_WORLD);
+        return;
+      }
+
       statistics.start("Initialization");
       cugw<prec> gw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task, &_mem_mgr);
 
 
-      MPI_Barrier(MPI_COMM_WORLD);
       if(shmem_rank_==0){
         std::cout<<"memory manager node zero: "<<std::endl;
         std::cout<<_mem_mgr<<std::endl;
       }
+      MPI_Barrier(MPI_COMM_WORLD);
       statistics.end();
+
 
       size_t                k             =this_task.k;
       size_t                q             =this_task.q;
