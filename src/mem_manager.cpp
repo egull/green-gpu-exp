@@ -1,4 +1,5 @@
-#include"green/gpu/mem_manager.h"
+#include <mpi.h>
+#include "green/gpu/mem_manager.h"
 #include <unistd.h>
 #include <iostream>
 #include <sys/time.h>
@@ -12,7 +13,7 @@ void mem_manager::compute_total_memory(){
   total_memory_=pages*page_size;
 }
 void mem_manager::register_memory(const std::string &name, const std::size_t &size){
-  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, shmem_win_);
+  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, *(MPI_Win*)shmem_win_ptr_);
 
   //make sure we have unique entries
   if(count(name)>0) throw std::runtime_error("Mem manager: entry: "+name+"is already registered");
@@ -26,14 +27,14 @@ void mem_manager::register_memory(const std::string &name, const std::size_t &si
     //consider throwing to save the user some pain.
     std::cout<<"WARNING: allocated memory> total memory: "<<shmem_ptr_->registered_memory_/GB<<" "<<total_memory_/GB<<" GB"<<std::endl;
   }
-  MPI_Win_unlock(0, shmem_win_);
+  MPI_Win_unlock(0, *(MPI_Win*)shmem_win_ptr_);
 }
 void mem_manager::register_memory(const std::string &name, int rank, const std::size_t &size){
   std::stringstream nr; nr<<name<<"_"<<rank;
   register_memory(nr.str(), size);
 }
 void mem_manager::deregister_memory(const std::string &name){
-  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, shmem_win_);
+  MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0,0, *(MPI_Win*)shmem_win_ptr_);
   //make sure we have unique entries
   if(count(name)==0) throw std::runtime_error("Mem manager: entry: "+name+" is not registered");
 
@@ -47,7 +48,7 @@ void mem_manager::deregister_memory(const std::string &name){
   if(shmem_ptr_->registered_memory_<0){
     throw std::logic_error("registered memory is below zero");
   }
-  MPI_Win_unlock(0, shmem_win_);
+  MPI_Win_unlock(0, *(MPI_Win*)shmem_win_ptr_);
 }
 void mem_manager::deregister_memory(const std::string &name, int rank){
   std::stringstream nr; nr<<name<<"_"<<rank;
@@ -77,11 +78,11 @@ std::size_t mem_manager::count(const std::string &s) const{
 void mem_manager::allocate_memory(){
   int global_rank; MPI_Comm_rank(MPI_COMM_WORLD, &global_rank);
   MPI_Info info; MPI_Info_create(&info);
-  MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,global_rank,info,&shmem_comm_);
-  MPI_Comm_size(shmem_comm_,&shmem_size_);
-  MPI_Comm_rank(shmem_comm_,&shmem_rank_);
+  MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,global_rank,info,(MPI_Comm*)shmem_comm_ptr_);
+  MPI_Comm_size(*(MPI_Comm*)shmem_comm_ptr_,&shmem_size_);
+  MPI_Comm_rank(*(MPI_Comm*)shmem_comm_ptr_,&shmem_rank_);
 
-  int err=MPI_Win_allocate_shared(shmem_rank_==0?sizeof(shmem):0, sizeof(shmem), MPI_INFO_NULL, shmem_comm_, &shmem_alloc_, &shmem_win_);
+  int err=MPI_Win_allocate_shared(shmem_rank_==0?sizeof(shmem):0, sizeof(shmem), MPI_INFO_NULL, *(MPI_Comm*)shmem_comm_ptr_, &shmem_alloc_, (MPI_Win*)shmem_win_ptr_);
   if(err !=MPI_SUCCESS){
     std::cerr<<"memory allocation error on shmem rank: "<<shmem_rank_<<std::endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
@@ -89,8 +90,24 @@ void mem_manager::allocate_memory(){
   //get a local pointer to shared memory buffer
   MPI_Aint rss2;
   int soT2;
-  MPI_Win_shared_query(shmem_win_, 0, &rss2, &soT2, &shmem_ptr_);
+  MPI_Win_shared_query(*(MPI_Win*)shmem_win_ptr_, 0, &rss2, &soT2, &shmem_ptr_);
 
   //entries_=new entry_t[MMGR_MAX_REG_ENTRIES];
  
 }
+mem_manager::mem_manager()
+   {
+    shmem_comm_ptr_=new MPI_Comm;
+    shmem_win_ptr_=new MPI_Win;
+    allocate_memory();
+    shmem_ptr_->num_entries_=0;
+    shmem_ptr_->registered_memory_=0;
+    compute_total_memory();
+  }
+mem_manager::~mem_manager(){
+    MPI_Win_free((MPI_Win*)shmem_win_ptr_);
+    delete (MPI_Win*)shmem_win_ptr_;
+    MPI_Comm_free((MPI_Comm*)shmem_comm_ptr_);
+    delete (MPI_Comm*)shmem_comm_ptr_;
+  }
+

@@ -165,7 +165,7 @@ namespace green::gpu {
   }
 
   template <typename prec>
-    cugw_utils<prec>::cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task):
+    cugw_utils<prec>::cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task, mem_manager *mem_mgr):
       _nts(nts),
       _nt_batch(nt_batch),
       _nw_b(nw_b),
@@ -178,7 +178,9 @@ namespace green::gpu {
       V_Qpm(nullptr, _NQ, _nao, _nao),
       V_Qim(nullptr, _NQ, _nao, _nao),
       Gk1_stij(nullptr, _ns, _nts, _nao, _nao), 
-      Gk_smtij(nullptr, _nts, _nao, _nao)
+      Gk_smtij(nullptr, _ns, _nts, _nao, _nao),
+      PQ_stab(nullptr, _ns, _nts, _NQ, _NQ),
+      mem_mgr_(mem_mgr)
       {
     //set the proper GPU and initialize cublas solver
     if (cudaSetDevice(this_task.gpu) != cudaSuccess) throw std::runtime_error("Error in cudaSetDevice2");
@@ -193,12 +195,17 @@ namespace green::gpu {
     if (cudaMallocHost(&V_Qim_hostptr, _NQ* _nao*_nao* sizeof(cuda_complex),cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate V_Qim_ptr");
     if (cudaMallocHost(&Gk1_stij_hostptr, _ns*_nts*_nao*_nao* sizeof(cuda_complex),cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate Gk1_stij_ptr");
     if (cudaMallocHost(&Gk_smtij_hostptr, _ns*_nts*_nao*_nao* sizeof(cuda_complex), cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate Gk_smtij_ptr");
+    if (cudaMallocHost(&PQ_stab_hostptr, _ns*_nts*_NQ*_NQ* sizeof(cuda_complex), cudaHostAllocWriteCombined) != cudaSuccess) throw std::runtime_error("failure to allocate PQ_stab_ptr");
+
  
     //allocate host matrix wrappers around host pointers
     V_Qpm.set_ref(V_Qpm_hostptr);
     V_Qim.set_ref(V_Qim_hostptr);
     Gk1_stij.set_ref(Gk1_stij_hostptr);
     Gk_smtij.set_ref(Gk_smtij_hostptr);
+    mem_mgr_->register_memory("V_Qpm and V_Qim",this_task.global_rank,2*V_Qpm.size()*sizeof(std::complex<prec>));
+    mem_mgr_->register_memory("Gk1_stij, Sigma_stij, and Gk_smtij",this_task.global_rank,2*Gk1_stij.size()*sizeof(std::complex<prec>));
+    mem_mgr_->register_memory("P and P0 Q",this_task.global_rank,PQ_stab.size()*sizeof(std::complex<prec>));
 
     sigma_kstij_device = nullptr;
     g_kstij_device     = nullptr;

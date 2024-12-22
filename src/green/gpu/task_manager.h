@@ -9,9 +9,11 @@ struct task_t{
   int q;
   int k;
   int taskidx;
+  int global_rank;
   int active_core_on_node;
   int gpu;
   bool idle;
+
 static std::vector<std::vector<task_t> > define_tasks(int inQ, int nK, int nNodes, int nCores_per_node, int nGPUs, int verbose=0){
   std::cout<<"resource estimation for inQ: "<<inQ<<" nK: "<<nK<<" nNodes: "<<nNodes<<" nCores_per_node: "<<nCores_per_node<<" on "<<nGPUs<<" GPUs"<<std::endl;
   int ntotal=0;
@@ -46,6 +48,7 @@ static std::vector<std::vector<task_t> > define_tasks(int inQ, int nK, int nNode
           { 
             task_info[cycle][idx].node=n;
             task_info[cycle][idx].core=c;
+            task_info[cycle][idx].global_rank=n*nCores_per_node+c;
             task_info[cycle][idx].cycle=cycle;
             task_info[cycle][idx].q=q_this_core;
             task_info[cycle][idx].k=k_this_core;

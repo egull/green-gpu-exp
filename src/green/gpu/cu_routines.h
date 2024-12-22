@@ -30,6 +30,7 @@
 #include "cuda_common.h"
 #include "cugw_qpt.h"
 #include "task_manager.h"
+#include "mem_manager.h"
 
 __global__ void initialize_array(cuDoubleComplex* array, cuDoubleComplex value, int count);
 
@@ -138,7 +139,7 @@ namespace green::gpu {
     using ptensor4 = green::ndarray::ndarray<std::complex<prec>, 4>;
 
   public:
-    cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task);
+    cugw_utils(int nts, int nt_batch, int nw_b, int ns, int nk, int ink, int nqkpt, int NQ, int nao, const task_t &this_task, mem_manager *mem_mgr_);
     ~cugw_utils();
 
     void solve_g_to_P0(int _nts, int _ns, int _nk, int _ink, int _nao, const std::vector<size_t>& reduced_to_full,
@@ -174,13 +175,18 @@ namespace green::gpu {
     ptensor4 Gk1_stij;
     ptensor4 Gk_smtij;
     ptensor4 Sigmak_stij; // = Gk_smtij;
+    ptensor4 PQ_stab; // = Gk_smtij;
+
+    mem_manager *mem_mgr_; //pointer to node-local memory manager to keep track of mem used
 
     //pinned memory pointer
     std::complex<prec> *V_Qpm_hostptr;
     std::complex<prec> *V_Qim_hostptr;
     std::complex<prec> *Gk1_stij_hostptr;
     std::complex<prec> *Gk_smtij_hostptr;
-    std::complex<prec> *Sigmak_stij_hostptr;
+    std::complex<prec> *Sigmak_stij_hostptr; //will use memory of Gk1
+    std::complex<prec> *PQ_stab_hostptr;
+    std::complex<prec> *P0Q_stab_hostptr;  //will use memory of PQ
 
     cuda_complex*                  g_kstij_device;
     cuda_complex*                  g_ksmtij_device;

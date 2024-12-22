@@ -4,7 +4,6 @@
 #include<iostream>
 #include<sstream>
 #include<vector>
-#include<mpi.h>
 
 #define MMGR_MAX_STRING_LENGTH 100
 #define MMGR_MAX_REG_ENTRIES 100
@@ -15,16 +14,8 @@ class mem_manager{
 public:
   typedef std::pair<char[MMGR_MAX_STRING_LENGTH], std::size_t> entry_t;
   typedef entry_t* entries_t;
-  mem_manager()
-   {
-    allocate_memory();
-    shmem_ptr_->num_entries_=0;
-    shmem_ptr_->registered_memory_=0;
-    compute_total_memory();
-  }
-  ~mem_manager(){
-    MPI_Win_free(&shmem_win_);
-  }
+  mem_manager();
+  ~mem_manager();
   //obtain totally available memory on this machine
   const std::size_t &total_memory() const{return total_memory_;}
   //memory that has been registered as used. return total amount 
@@ -62,10 +53,10 @@ private:
   } *shmem_ptr_;  //use this for access
 
   shmem *shmem_alloc_; //this is only valid on shmem rank 0
-  MPI_Win   shmem_win_;
+  void *shmem_win_ptr_; //void to avoid pulling in MPI dependence. will be typecst to MPI_Win where type is known
 
   //MPI shmem communicators,, rank, and size
-  MPI_Comm shmem_comm_;
+  void *shmem_comm_ptr_; //void to avoid pulling in MPI dependence. will be typecast to MPI_Comm where type is known
   int shmem_size_;
   int shmem_rank_;
 

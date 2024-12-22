@@ -99,7 +99,7 @@ namespace green::gpu {
 
       //allocate MPI communicators
       setup_MPI_structure(); //revise this. based on node and GPU communicators.
-      _coul_int = new df_integral_t(_path, _nao, _NQ, _bz_utils);
+      _coul_int = new df_integral_t(_path, _nao, _NQ, _bz_utils, _verbose);
       if(shmem_rank_==0){
         _mem_mgr.register_memory("Coulomb (shared nodelocal)", _coul_int->size()*sizeof(std::complex<double>));
       }
@@ -226,10 +226,10 @@ namespace green::gpu {
       MPI_Comm_rank(q_comm, &q_rank);
       MPI_Comm_size(q_comm, &q_size);
 
-      ztensor<4> Sigmak_tsij(_nts, _ns, _nao, _nao); //end result: sigma for a given k
-      ztensor<4> P0Q_tsab(_nts, _ns, _NQ, _NQ); //intermediate step: P0 for a given Q 
-      _mem_mgr.register_memory("sigma_tau k",global_rank_,Sigmak_tsij.size()*sizeof(std::complex<prec>));
-      _mem_mgr.register_memory("P_tau Q",global_rank_,P0Q_tsab.size()*sizeof(std::complex<prec>));
+      /*ztensor<4> Sigmak_tsij(_nts, _ns, _nao, _nao); //end result: sigma for a given k
+      ztensor<4> P0Q_tsab(_nts, _ns, _NQ, _NQ); //intermediate step: P0 for a given Q */
+      /*_mem_mgr.register_memory("sigma_tau k",global_rank_,Sigmak_tsij.size()*sizeof(std::complex<prec>));
+      _mem_mgr.register_memory("P_tau Q",global_rank_,P0Q_tsab.size()*sizeof(std::complex<prec>));*/
       if(shmem_rank_==0){
         std::cout<<"memory manager node zero: "<<std::endl;
         std::cout<<_mem_mgr<<std::endl;
@@ -238,7 +238,7 @@ namespace green::gpu {
 
       //GW_check_devices_free_space();
       statistics.start("Initialization");
-      cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task);
+      cugw_utils<prec> cugw(_nts, _nt_batch, _nw_b, _ns, _nk, _ink, _nqkpt, _NQ, _nao, this_task, &_mem_mgr);
 
 
       statistics.end();
@@ -474,7 +474,7 @@ exit(-1); //not implemented.
     // k = (k1, 0, q, k1+q) or (k1, q, 0, k1-q)
     size_t k1 = k[0];
     size_t k1q = k[3];
-    _coul_int->read_integrals(k1, k1q);
+    //_coul_int->read_integrals(k1, k1q);
   }
 
   void gw_gpu_kernel::nt_batch_heuristics(std::size_t &target_ntbatch, std::size_t &target_nqkpts){
